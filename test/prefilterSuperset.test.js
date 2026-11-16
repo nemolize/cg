@@ -111,6 +111,10 @@ const CODEX_RAW_LINES = [
   `{"timestamp":"2026-07-12T00:00:00Z","type":"response_item","payload":{"type":"custom_tool_call","name":"exec","input":"tools.exec_command({cmd:${BS}"rg ratatui${BS}"})"}}`,
   `{"timestamp":"2026-07-12T00:00:00Z","type":"response_item","payload":{"type":"custom_tool_call","name":"exec","input":"first${BS}nsecond 1.50 line"}}`,
   `{"timestamp":"2026-07-12T00:00:00Z","type":"response_item","payload":{"type":"function_call","name":"send_message","arguments":"{${BS}"target${BS}":${BS}"/root${BS}"}"}}`,
+  `{"timestamp":"2026-07-12T00:00:00Z","type":"response_item","payload":{"type":"web_search_call","action":{"type":"open_page","url":"https://x.test/a"}}}`,
+  `{"timestamp":"2026-07-12T00:00:00Z","type":"response_item","payload":{"type":"web_search_call","action":{"type":"find_in_page","url":"https://x.test/a","pattern":"needle"}}}`,
+  `{"timestamp":"2026-07-12T00:00:00Z","type":"response_item","payload":{"type":"tool_search_call","arguments":{"query":"q","limit":1}}}`,
+  `{"timestamp":"2026-07-12T00:00:00Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{${BS}"cmd${BS}":${BS}"a${BS}${BS}nb ${BS}${BS}${BS}"q${BS}${BS}${BS}"${BS}"}"}}`,
   `{"timestamp":"2026-07-12T00:00:00Z","type":"response_item","payload":{"type":"custom_tool_call_output","output":"exit_code 0${BS}noutput ratatui"}}`,
   `{"timestamp":"2026-07-12T00:00:00Z","type":"response_item","payload":{"type":"custom_tool_call_output","output":[{"type":"input_text","text":"array ${BS}u003c form"}]}}`,
 ];
