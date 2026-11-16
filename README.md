@@ -363,9 +363,10 @@ crashing the scan, since neither transcript schema is documented and both drift.
 Searchable text is pulled from message text, thinking blocks, tool inputs (e.g.
 the Bash command run), and tool results.
 
-The rest of this section describes the Claude transcript. A Codex tool call
-carries its arguments as one opaque string rather than a keyed object, so the
-shaping below does not apply to it — the line shows the payload as recorded.
+The rest of this section describes the Claude transcript. A Codex
+`custom_tool_call` carries its input as one opaque string rather than a keyed
+object, so the shaping below does not apply to it — the line shows the payload as
+recorded.
 
 A tool call's arguments become one `key: value` line each, with multi-line
 values keeping their real line breaks — so a hit inside a long heredoc shows its

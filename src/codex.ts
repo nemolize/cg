@@ -83,7 +83,8 @@ function renderRecord(record: Record<string, unknown>): string[] {
 }
 
 function renderInput(input: unknown): string[] {
-  if (isRecord(input)) return renderRecord(input);
+  if (isRecord(input) && Object.keys(input).length > 0)
+    return renderRecord(input);
   if (input === undefined) return [];
   return renderValue(input).split("\n");
 }
@@ -103,7 +104,11 @@ function readToolCall(
   if (payload["type"] === "function_call") {
     input = payload["arguments"];
     if (typeof input === "string") input = parseArguments(input);
-    body = renderInput(input);
+    const legacy = payload["input"];
+    body =
+      input === undefined && typeof legacy === "string"
+        ? legacy.split("\n")
+        : renderInput(input);
   } else {
     input = payload["input"];
     const raw = payload["input"] ?? payload["arguments"];
@@ -115,10 +120,6 @@ function readToolCall(
   return { toolCall: withInput(name, input), textLines };
 }
 
-/**
- * Read separately because a search call keeps its input in a shape of its own —
- * `action` for the web, `arguments` for a tool lookup — not `input`.
- */
 function readSearchCall(
   payload: Record<string, unknown>,
 ): { toolCall: ToolCall; textLines: string[] } | undefined {

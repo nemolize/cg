@@ -405,6 +405,30 @@ test.each([
   },
 );
 
+test("a nameless function call still yields a turn for empty-record arguments", async () => {
+  const line = JSON.stringify({
+    timestamp: "2026-09-14T04:01:30.000Z",
+    type: "response_item",
+    payload: { type: "function_call", arguments: "{}" },
+  });
+  await withCodexFile([meta(), line], (turns) => {
+    expect(turns).toHaveLength(1);
+    expect(turns[0].textLines).toEqual(["{}"]);
+    expect(turns[0].toolCalls).toEqual([{ name: "", paths: [], input: {} }]);
+  });
+});
+
+test("a function call with only a string input keeps it as text", async () => {
+  const line = JSON.stringify({
+    timestamp: "2026-09-14T04:01:30.000Z",
+    type: "response_item",
+    payload: { type: "function_call", input: "abc\ndef" },
+  });
+  await withCodexFile([meta(), line], (turns) => {
+    expect(turns[0].textLines).toEqual(["abc", "def"]);
+  });
+});
+
 test("a function call's quoted text is matched by the pattern as typed", async () => {
   const args = '{"cmd":"echo \\"hi\\""}';
   await withCodexFile([meta(), functionCall(args)], (turns) => {
