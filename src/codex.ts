@@ -76,6 +76,19 @@ function withInput(name: string, input: unknown): ToolCall {
   return { name, paths: [], ...(input != null ? { input } : {}) };
 }
 
+function renderRecord(record: Record<string, unknown>): string[] {
+  return Object.entries(record).flatMap(([key, value]) =>
+    `${key}: ${renderValue(value)}`.split("\n"),
+  );
+}
+
+function renderInput(input: unknown): string[] {
+  if (isRecord(input) && Object.keys(input).length > 0)
+    return renderRecord(input);
+  if (input === undefined) return [];
+  return renderValue(input).split("\n");
+}
+
 /**
  * `paths` stays empty because no argument field is known to hold a path, even
  * once a `function_call`'s JSON is parsed.
@@ -84,54 +97,40 @@ function readToolCall(
   payload: Record<string, unknown>,
 ): { toolCall: ToolCall; textLines: string[] } | undefined {
   const name = str(payload["name"]) ?? "";
-  const raw = payload["input"] ?? payload["arguments"];
-  const args = typeof raw === "string" ? raw : undefined;
-  if (name === "" && args === undefined) return undefined;
+  const header = name === "" ? [] : [`${TOOL_MARK} ${name}`];
 
-  const textLines: string[] = [];
-  if (name !== "") textLines.push(`${TOOL_MARK} ${name}`);
-  if (args !== undefined) textLines.push(...args.split("\n"));
-
-  let input = payload["input"];
+  let input: unknown;
+  let body: string[];
   if (payload["type"] === "function_call") {
     input = payload["arguments"];
     if (typeof input === "string") input = parseArguments(input);
+    const legacy = payload["input"];
+    body =
+      input === undefined && typeof legacy === "string"
+        ? legacy.split("\n")
+        : renderInput(input);
+  } else {
+    input = payload["input"];
+    const raw = payload["input"] ?? payload["arguments"];
+    body = typeof raw === "string" ? raw.split("\n") : [];
   }
+
+  const textLines = [...header, ...body];
+  if (textLines.length === 0) return undefined;
   return { toolCall: withInput(name, input), textLines };
 }
 
-/**
- * Read separately because a search call keeps its query in a shape of its own —
- * `action.queries` for the web, `arguments.query` for a tool lookup — not `input`.
- */
 function readSearchCall(
   payload: Record<string, unknown>,
 ): { toolCall: ToolCall; textLines: string[] } | undefined {
   const name = str(payload["type"]) ?? "";
-  const queries: string[] = [];
+  const input =
+    name === "web_search_call" ? payload["action"] : payload["arguments"];
+  if (!isRecord(input) || Object.keys(input).length === 0) return undefined;
 
-  const action = payload["action"];
-  if (isRecord(action)) {
-    const list = action["queries"];
-    if (Array.isArray(list)) {
-      for (const q of list) {
-        if (typeof q === "string" && q !== "") queries.push(q);
-      }
-    }
-    const one = str(action["query"]);
-    if (one !== undefined) queries.push(one);
-  }
-  const args = payload["arguments"];
-  if (isRecord(args)) {
-    const one = str(args["query"]);
-    if (one !== undefined) queries.push(one);
-  }
-  if (queries.length === 0) return undefined;
-
-  const input = name === "web_search_call" ? action : args;
   return {
     toolCall: withInput(name, input),
-    textLines: [`${TOOL_MARK} ${name}`, ...queries],
+    textLines: [`${TOOL_MARK} ${name}`, ...renderRecord(input)],
   };
 }
 

@@ -232,7 +232,11 @@ test("a web search call contributes its queries", async () => {
     ],
     (turns) => {
       expect(turns[0].role).toBe("assistant");
-      expect(turns[0].textLines[1]).toBe("needle release notes");
+      expect(turns[0].textLines).toEqual([
+        `${TOOL_MARK} web_search_call`,
+        "type: search",
+        "queries: [needle release notes]",
+      ]);
       expect(turns[0].toolCalls).toEqual([
         {
           name: "web_search_call",
@@ -258,7 +262,11 @@ test("a tool search call contributes its query", async () => {
       }),
     ],
     (turns) => {
-      expect(turns[0].textLines[1]).toBe("serena initial_instructions");
+      expect(turns[0].textLines).toEqual([
+        `${TOOL_MARK} tool_search_call`,
+        "query: serena initial_instructions",
+        "limit: 1",
+      ]);
       expect(turns[0].toolCalls).toEqual([
         {
           name: "tool_search_call",
@@ -270,20 +278,162 @@ test("a tool search call contributes its query", async () => {
   );
 });
 
-test("a search call with no query yields no turn", async () => {
+test("a search call whose action has no keys yields no turn", async () => {
   await withCodexFile(
     [
       meta(),
       JSON.stringify({
         timestamp: "2026-09-14T04:05:00.000Z",
         type: "response_item",
-        payload: { type: "web_search_call", action: { type: "search" } },
+        payload: { type: "web_search_call", action: {} },
       }),
     ],
     (turns) => {
       expect(turns).toEqual([]);
     },
   );
+});
+
+function searchCall(payload) {
+  return JSON.stringify({
+    timestamp: "2026-09-14T04:05:30.000Z",
+    type: "response_item",
+    payload,
+  });
+}
+
+// Every key is rendered, `type` and `limit` included: the schema is
+// undocumented and drifts, so no exclusion list could stay current.
+test.each([
+  [
+    "an open_page action",
+    {
+      type: "web_search_call",
+      action: { type: "open_page", url: "https://x.test/a" },
+    },
+    [
+      `${TOOL_MARK} web_search_call`,
+      "type: open_page",
+      "url: https://x.test/a",
+    ],
+  ],
+  [
+    "a find_in_page action",
+    {
+      type: "web_search_call",
+      action: {
+        type: "find_in_page",
+        url: "https://x.test/a",
+        pattern: "needle",
+      },
+    },
+    [
+      `${TOOL_MARK} web_search_call`,
+      "type: find_in_page",
+      "url: https://x.test/a",
+      "pattern: needle",
+    ],
+  ],
+  [
+    "a search action with several queries",
+    {
+      type: "web_search_call",
+      action: { type: "search", queries: ["a b", "c"] },
+    },
+    [`${TOOL_MARK} web_search_call`, "type: search", "queries: [a b, c]"],
+  ],
+  [
+    "a search action with non-string queries",
+    { type: "web_search_call", action: { queries: [1, 2] } },
+    [`${TOOL_MARK} web_search_call`, "queries: [1, 2]"],
+  ],
+  [
+    "a tool search call",
+    { type: "tool_search_call", arguments: { query: "q", limit: 1 } },
+    [`${TOOL_MARK} tool_search_call`, "query: q", "limit: 1"],
+  ],
+])(
+  "a search call renders %s as key: value lines",
+  async (_label, payload, expected) => {
+    await withCodexFile([meta(), searchCall(payload)], (turns) => {
+      expect(turns).toHaveLength(1);
+      expect(turns[0].textLines).toEqual(expected);
+    });
+  },
+);
+
+test.each([
+  [
+    "newlines in a string value become lines",
+    '{"cmd":"a\\nb","workdir":"/w"}',
+    [`${TOOL_MARK} shell`, "cmd: a", "b", "workdir: /w"],
+  ],
+  [
+    "a quote in a value is the literal quote, not its JSON escape",
+    '{"cmd":"echo \\"hi\\""}',
+    [`${TOOL_MARK} shell`, 'cmd: echo "hi"'],
+  ],
+  [
+    "nested values render inline",
+    '{"opts":{"a":1,"b":[true,null]}}',
+    [`${TOOL_MARK} shell`, "opts: {a: 1, b: [true, null]}"],
+  ],
+  ["a parsed array is one line", "[1,2]", [`${TOOL_MARK} shell`, "[1, 2]"]],
+  [
+    "a parsed string is its own text",
+    '"a\\nb"',
+    [`${TOOL_MARK} shell`, "a", "b"],
+  ],
+  ["a parsed number is one line", "7", [`${TOOL_MARK} shell`, "7"]],
+  ["a parsed null is one line", "null", [`${TOOL_MARK} shell`, "null"]],
+  [
+    "an unparseable string stays raw",
+    "{not json",
+    [`${TOOL_MARK} shell`, "{not json"],
+  ],
+  [
+    "an unparseable string is split on its newlines",
+    "{not\njson",
+    [`${TOOL_MARK} shell`, "{not", "json"],
+  ],
+])(
+  "a function call renders its arguments: %s",
+  async (_label, args, expected) => {
+    await withCodexFile([meta(), functionCall(args)], (turns) => {
+      expect(turns[0].textLines).toEqual(expected);
+    });
+  },
+);
+
+test("a nameless function call still yields a turn for empty-record arguments", async () => {
+  const line = JSON.stringify({
+    timestamp: "2026-09-14T04:01:30.000Z",
+    type: "response_item",
+    payload: { type: "function_call", arguments: "{}" },
+  });
+  await withCodexFile([meta(), line], (turns) => {
+    expect(turns).toHaveLength(1);
+    expect(turns[0].textLines).toEqual(["{}"]);
+    expect(turns[0].toolCalls).toEqual([{ name: "", paths: [], input: {} }]);
+  });
+});
+
+test("a function call with only a string input keeps it as text", async () => {
+  const line = JSON.stringify({
+    timestamp: "2026-09-14T04:01:30.000Z",
+    type: "response_item",
+    payload: { type: "function_call", input: "abc\ndef" },
+  });
+  await withCodexFile([meta(), line], (turns) => {
+    expect(turns[0].textLines).toEqual(["abc", "def"]);
+  });
+});
+
+test("a function call's quoted text is matched by the pattern as typed", async () => {
+  const args = '{"cmd":"echo \\"hi\\""}';
+  await withCodexFile([meta(), functionCall(args)], (turns) => {
+    expect(turns[0].textLines.some((l) => l.includes('echo "hi"'))).toBe(true);
+  });
 });
 
 // Old rollouts put a one-line summary beside the encrypted body; current ones
@@ -402,8 +552,8 @@ test.each([
   ],
   ["a tool call has neither name nor arguments", { type: "custom_tool_call" }],
   [
-    "a search call's queries are not strings",
-    { type: "web_search_call", action: { queries: [1, 2] } },
+    "a search call's action is not a record",
+    { type: "web_search_call", action: "needle" },
   ],
   [
     "reasoning's summary is not an array",

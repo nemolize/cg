@@ -367,6 +367,47 @@ test("a codex root is searched under the codex schema end to end", () => {
   }
 });
 
+test("a codex open_page url is searchable end to end", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-codex-url-"));
+  try {
+    writeFileSync(
+      join(dir, "rollout-2026-07-13T00-00-00-t1.jsonl"),
+      [
+        JSON.stringify({
+          timestamp: "2026-07-13T00:00:00Z",
+          type: "session_meta",
+          payload: {
+            session_id: "cx-1",
+            id: "cx-1",
+            cwd: "/cx-proj",
+            thread_source: "user",
+          },
+        }),
+        JSON.stringify({
+          timestamp: "2026-07-13T00:01:00Z",
+          type: "response_item",
+          payload: {
+            type: "web_search_call",
+            action: { type: "open_page", url: "https://x.test/needle-page" },
+          },
+        }),
+      ].join("\n"),
+    );
+    const out = runCli([
+      "x.test/needle",
+      "--source",
+      "codex",
+      "--codex-root",
+      dir,
+      "--color",
+      "never",
+    ]);
+    expect(out).toContain("url: https://x.test/needle-page");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("--json carries a tool call's input in full, on a hit and in a --session dump", () => {
   const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
   const long = "x".repeat(100_000);

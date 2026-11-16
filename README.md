@@ -251,10 +251,6 @@ A call that carries no input omits the key. `input` is always emitted in full �
 no truncation, since a cut value would silently miscount in `jq`; drop it with
 `jq 'del(.toolCalls[]?.input)'` when you do not want it.
 
-A Codex `web_search_call` is collected only when its `action` carries a query;
-`open_page` and `find_in_page` actions carry none and produce no hit, so they are
-absent from `toolCalls` too.
-
 ## Codex support
 
 Codex transcripts are searched alongside Claude's by default, and a Codex hit is
@@ -291,9 +287,17 @@ Three filters read something Codex records differently, or not at all:
 instructions rather than anything either party said — the role Claude's `isMeta`
 turns play.
 
-What a Codex session searched for is searchable too: a `web_search_call` or
-`tool_search_call` records its query in plaintext, and those queries are pulled
-in like any other tool input.
+A Codex tool call's input is rendered like a Claude `tool_use`: a `⚙ <name>`
+line, then one `key: value` line per key, so any field is searchable and the
+matched line says which key hit. This covers a `function_call`'s `arguments`
+(parsed as JSON), a `tool_search_call`'s `arguments` and every `web_search_call`
+`action` — `open_page` and `find_in_page` included, not only searches. A string
+value's own newlines become separate lines, so `-C N` shows a command's
+neighbourhood; arrays and nested objects render inline (`queries: [a, b]`). Every
+key is shown, `type` included, so a pattern equal to a key name matches every
+call carrying that key. A `function_call` whose arguments are not an object shows
+the parsed value, or the raw string when it does not parse. `--tool
+web_search_call` therefore selects `open_page` and `find_in_page` calls too.
 
 Codex's reasoning is stored encrypted, so only the one-line summary some
 rollouts record beside it is searchable — current Codex writes that field empty,
@@ -359,9 +363,10 @@ crashing the scan, since neither transcript schema is documented and both drift.
 Searchable text is pulled from message text, thinking blocks, tool inputs (e.g.
 the Bash command run), and tool results.
 
-The rest of this section describes the Claude transcript. A Codex tool call
-carries its arguments as one opaque string rather than a keyed object, so the
-shaping below does not apply to it — the line shows the payload as recorded.
+The rest of this section describes the Claude transcript. A Codex
+`custom_tool_call` carries its input as one opaque string rather than a keyed
+object, so the shaping below does not apply to it — the line shows the payload as
+recorded.
 
 A tool call's arguments become one `key: value` line each, with multi-line
 values keeping their real line breaks — so a hit inside a long heredoc shows its
