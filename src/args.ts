@@ -165,8 +165,8 @@ const findControlOption = (args: string[]): "help" | "version" | undefined => {
  * Parse argv (excluding node + script) into structured options. Unknown flags
  * and missing values produce an `error` result rather than throwing, so the CLI
  * can print a message + usage and exit non-zero. The first non-flag argument is
- * the pattern — required unless `--session`, `--tool`, `--file` or `--json` is
- * given; a leading `--` stops option parsing.
+ * the pattern — required unless a flag stands in for it (see the guard below);
+ * a leading `--` stops option parsing.
  */
 export function parseArgs(
   argv: string[],
@@ -278,8 +278,8 @@ export function parseArgs(
     return err("--file requires a path substring");
   }
 
-  // `--tool` / `--file` / `--json` select turns on their own, so they stand in
-  // for the pattern the same way `--session` does.
+  // `--tool` / `--file` select turns on their own, so they stand in for the
+  // pattern the same way `--session` does; `--json` feeds a pipe, not a terminal.
   if (
     pattern === undefined &&
     session === undefined &&

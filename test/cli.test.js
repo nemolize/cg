@@ -762,14 +762,15 @@ const daysAgo = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
 
 test("the sessions-active recipe counts sessions, not turns, per project", () => {
   const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
-  const turn = (sessionId, cwd, timestamp) =>
+  const turn = (sessionId, cwd, timestamp, content = "hello") =>
     JSON.stringify({
       type: "user",
       sessionId,
       timestamp,
       cwd,
-      message: { content: "hello" },
+      message: { content },
     });
+  const emptyResult = [{ type: "tool_result", tool_use_id: "t1", content: "" }];
   writeFileSync(
     join(dir, "a.jsonl"),
     [
@@ -778,12 +779,14 @@ test("the sessions-active recipe counts sessions, not turns, per project", () =>
       turn("s2", "/proj-a", daysAgo(5)),
       turn("s3", "/proj-b", daysAgo(8)),
       turn("s4", "/proj-b", daysAgo(90)),
+      turn("s5", "/proj-c", daysAgo(4), emptyResult),
     ].join("\n"),
   );
   try {
     expect(runRecipe("Sessions active per project", dir)).toStrictEqual([
       { cwd: "/proj-a", sessionsActive: 2 },
       { cwd: "/proj-b", sessionsActive: 1 },
+      { cwd: "/proj-c", sessionsActive: 1 },
     ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
