@@ -210,13 +210,16 @@ messages are `text`, `reasoning` is `thinking`, calls are `tool_use`, and call
 outputs are `tool_result`.
 
 `--role human` keeps a turn only when its `role` is `user`, it is not `isMeta`,
-and `contentKinds` includes `text`; `--role user` is unchanged. It is still not
-strictly "what the human typed":
+and `contentKinds` includes `text`; `--role user` is unchanged. A Claude line
+that records `origin.kind` or `turnOrigin` is also dropped unless that value is
+`human`, which leaves out background-task notices, scheduled and plugin
+prompts, and SDK prompts. A line with neither field is judged by the text rule
+alone. It is still not strictly "what the human typed":
 
 - subagent orchestrator prompts count as `user` text — add `--subagents exclude`;
-- text Claude Code injects itself — background-task completion notices,
-  scheduled or plugin prompts, the output of a `!` shell command, interrupt
-  markers — is also recorded as `user` text and is not detected;
+- Claude lines without an origin field are not detected: messages from another
+  Claude session in the same team (the largest group on current versions),
+  older transcripts, the output of a `!` shell command, interrupt markers;
 - Codex's injected context is likewise not detected.
 
 `--role human` drops `isMeta` turns even with `--include-meta`.

@@ -110,6 +110,33 @@ test("loadTurns tolerates missing optional fields", async () => {
     expect(turns[0].timestampMs).toBe(undefined);
     expect(turns[0].isMeta).toBe(false);
     expect(turns[0].isSidechain).toBe(false);
+    expect(turns[0].origin).toBe(undefined);
+    expect(turns[0].turnOrigin).toBe(undefined);
+  });
+});
+
+test("loadTurns reads origin.kind and turnOrigin, ignoring non-string values", async () => {
+  await withTempDir(async (dir) => {
+    const file = join(dir, "s.jsonl");
+    const line = (extra) =>
+      JSON.stringify({ type: "user", message: { content: "x" }, ...extra });
+    await writeFile(
+      file,
+      [
+        line({ origin: { kind: "plugin" }, turnOrigin: "system" }),
+        line({ turnOrigin: "scheduled" }),
+        line({ origin: { kind: 3 }, turnOrigin: { kind: "human" } }),
+        line({ origin: "human" }),
+      ].join("\n") + "\n",
+    );
+    const turns = [];
+    for await (const t of loadTurns(file)) turns.push(t);
+    expect(turns.map((t) => [t.origin, t.turnOrigin])).toEqual([
+      ["plugin", "system"],
+      [undefined, "scheduled"],
+      [undefined, undefined],
+      [undefined, undefined],
+    ]);
   });
 });
 

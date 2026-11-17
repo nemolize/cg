@@ -40,6 +40,9 @@ export interface Turn {
   cwd?: string | undefined;
   gitBranch?: string | undefined;
   isMeta: boolean;
+  /** Claude's `origin.kind` / `turnOrigin` (`human`, `plugin`, `scheduled`, …); either may be absent. */
+  origin?: string | undefined;
+  turnOrigin?: string | undefined;
   /**
    * True for a subagent (sidechain) turn. Subagent transcripts live beside the
    * session's own file and carry the *parent's* `sessionId`, so this is what

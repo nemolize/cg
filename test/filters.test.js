@@ -65,6 +65,31 @@ test("--role human keeps typed text, drops tool-result-only and meta lines", () 
   expect(passesFilters(turn({ role: "assistant" }), human)).toBe(false);
 });
 
+test("--role human drops a line whose origin is not human, whichever field carries it", () => {
+  const human = opts({ role: "human" });
+  expect(passesFilters(turn({ origin: "human" }), human)).toBe(true);
+  expect(passesFilters(turn({ turnOrigin: "human" }), human)).toBe(true);
+  expect(
+    passesFilters(turn({ origin: "human", turnOrigin: "human" }), human),
+  ).toBe(true);
+  expect(passesFilters(turn({ origin: "task-notification" }), human)).toBe(
+    false,
+  );
+  expect(passesFilters(turn({ origin: "plugin" }), human)).toBe(false);
+  expect(passesFilters(turn({ turnOrigin: "scheduled" }), human)).toBe(false);
+  expect(passesFilters(turn({ turnOrigin: "sdk" }), human)).toBe(false);
+  expect(
+    passesFilters(turn({ origin: "human", turnOrigin: "system" }), human),
+  ).toBe(false);
+  expect(
+    passesFilters(
+      turn({ origin: "human", contentKinds: ["tool_result"] }),
+      human,
+    ),
+  ).toBe(false);
+  expect(passesFilters(turn({ turnOrigin: "scheduled" }), opts())).toBe(true);
+});
+
 test("--role user still returns a tool-result-only line", () => {
   expect(
     passesFilters(
