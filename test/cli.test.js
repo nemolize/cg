@@ -673,24 +673,32 @@ test("--json carries messageId so the lines of one reply group in jq", () => {
   }
 });
 
-// The README's `jq` programs are run as written: a test of a copy would stay
-// green while the documented text drifted.
-function readmeJq(heading) {
+// The README's recipes are run as written, `cg` arguments and `jq` program
+// both: a test of a copy would stay green while the documented text drifted.
+function readmeRecipe(heading) {
   const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
-  const section = readme.slice(readme.indexOf(`### ${heading}\n`));
-  const match = /\| jq (-\w+ )?'([^']*)'/.exec(section);
-  if (match === null) throw new Error(`no jq recipe under "${heading}"`);
-  return { flags: match[1]?.trim(), program: match[2] };
+  const start = readme.indexOf(`### ${heading}\n`);
+  if (start === -1) throw new Error(`no section "${heading}"`);
+  const match = /^cg (.*) \| jq (-\w+ )?'([^']*)'/m.exec(readme.slice(start));
+  if (match === null) throw new Error(`no recipe under "${heading}"`);
+  return {
+    args: match[1].split(" "),
+    flags: match[2]?.trim(),
+    program: match[3],
+  };
 }
 
-function pipeThroughJq({ flags, program }, input) {
+function runRecipe(heading, root) {
+  const { args, flags, program } = readmeRecipe(heading);
   return JSON.parse(
     execFileSync("jq", [...(flags === undefined ? [] : [flags]), program], {
       encoding: "utf8",
-      input,
+      input: runCli([...args, "--root", root]),
     }),
   );
 }
+
+const daysAgo = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
 
 test("the sessions-active recipe counts sessions, not turns, per project", () => {
   const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
@@ -705,27 +713,15 @@ test("the sessions-active recipe counts sessions, not turns, per project", () =>
   writeFileSync(
     join(dir, "a.jsonl"),
     [
-      turn("s1", "/proj-a", "2026-07-10T00:00:00Z"),
-      turn("s1", "/proj-a", "2026-07-20T00:00:00Z"),
-      turn("s2", "/proj-a", "2026-07-15T00:00:00Z"),
-      turn("s3", "/proj-b", "2026-07-12T00:00:00Z"),
-      turn("s4", "/proj-b", "2026-06-01T00:00:00Z"),
+      turn("s1", "/proj-a", daysAgo(10)),
+      turn("s1", "/proj-a", daysAgo(2)),
+      turn("s2", "/proj-a", daysAgo(5)),
+      turn("s3", "/proj-b", daysAgo(8)),
+      turn("s4", "/proj-b", daysAgo(90)),
     ].join("\n"),
   );
   try {
-    const out = runCli([
-      "-e",
-      ".",
-      "--root",
-      dir,
-      "--since",
-      "2026-07-01",
-      "-l",
-      "--json",
-    ]);
-    expect(
-      pipeThroughJq(readmeJq("Sessions active per project"), out),
-    ).toStrictEqual([
+    expect(runRecipe("Sessions active per project", dir)).toStrictEqual([
       { cwd: "/proj-a", sessionsActive: 2 },
       { cwd: "/proj-b", sessionsActive: 1 },
     ]);
@@ -746,7 +742,7 @@ test("the edit-attempts recipe counts Edit and Write calls per file, not the oth
     JSON.stringify({
       type: "assistant",
       sessionId,
-      timestamp: "2026-07-10T00:00:00Z",
+      timestamp: daysAgo(1),
       cwd: "/proj",
       message: { content: blocks },
     });
@@ -764,18 +760,7 @@ test("the edit-attempts recipe counts Edit and Write calls per file, not the oth
     ].join("\n"),
   );
   try {
-    const out = runCli([
-      "--tool",
-      "Edit,Write",
-      "--source",
-      "claude",
-      "--root",
-      dir,
-      "--json",
-    ]);
-    expect(
-      pipeThroughJq(readmeJq("Edit attempts per file"), out),
-    ).toStrictEqual([
+    expect(runRecipe("Edit attempts per file", dir)).toStrictEqual([
       { file: "/proj/x.ts", attempts: 3 },
       { file: "/proj/z.ts", attempts: 2 },
       { file: "/proj/w.ts", attempts: 1 },

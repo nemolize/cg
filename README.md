@@ -346,10 +346,15 @@ pattern, and `-e .` matches any turn that has text; a turn with none (an empty
 tool result) is not seen, so a session whose only turns in the period were such
 results is missed.
 
-A session is filed under the `cwd` of its first matching turn, so one that
-changed directory is not counted twice. A line with no recorded `cwd` groups
-under `null`. Subagent turns belong to their parent's session; add
-`--subagents exclude` to leave them out.
+A project here is a `cwd`: a worktree or a subdirectory is a row of its own. A
+session is filed under one `cwd`, that of the first matching turn `cg` reads
+(not necessarily the earliest), so one that changed directory is not counted
+twice. A subagent's turn can supply it; `--subagents exclude` files the session
+by the conversation alone. A line with no recorded `cwd` groups under `null`.
+
+Subagent turns count toward their parent's session, except in the few old Codex
+rollouts that recorded no parent ([Subagent turns](#subagent-turns)): there each
+thread counts as a session of its own. `--subagents exclude` leaves them out.
 
 ### Edit attempts per file
 
@@ -563,7 +568,7 @@ source change.
 ```
 pnpm run lint            # eslint, prettier, type-check and knip, in parallel
 pnpm run fix             # apply the eslint and prettier fixes
-pnpm run test            # unit tests
+pnpm run test            # unit tests (the README recipe tests need `jq` on PATH)
 pnpm run test:coverage   # unit tests with a coverage report
 ```
 
