@@ -35,6 +35,7 @@ cg <pattern> [options]              # once installed globally
 cg --session <id> [pattern]         # read one session as a conversation
 cg --source codex <pattern>         # one agent's transcripts only
 cg --tool Edit --file <path>        # which session touched a file (Claude)
+cg --json [options]                 # every turn as JSON, no pattern needed
 ```
 
 ```
@@ -126,6 +127,10 @@ combination is a usage error rather than a silently dropped flag.
 
 - `-C, --context <N>` — lines of context around each match (default: 2).
 - `--json` — emit one JSON object per hit, one per line, for piping to `jq`.
+  The pattern is optional with it: without one, every turn that passes the
+  filters is emitted (see [Aggregating with jq](#aggregating-with-jq)). Without
+  `--json` a missing pattern is still an error, since printing every turn to a
+  terminal is never what was meant.
 - `--color <always|never|auto>` — colorize output (default: auto-detects a TTY).
 - `--resume` — print the resume command for the top hit only, worded for the
   agent that hit came from. Use once your filters have narrowed things down to
@@ -333,7 +338,7 @@ that reads like something bigger is the usual mistake.
 ### Sessions active per project
 
 ```sh
-cg -e . --since 30d -l --json | jq -s '
+cg --since 30d -l --json | jq -s '
   group_by(.cwd)
   | map({cwd: .[0].cwd, sessionsActive: length})
   | sort_by(-.sessionsActive)'
@@ -341,10 +346,9 @@ cg -e . --since 30d -l --json | jq -s '
 
 `sessionsActive` is the number of sessions with at least one turn in the period
 — not sessions started in it, time spent, or a rate. `-l --json` prints one line
-per session, so a session counts once however many turns it has. `cg` needs a
-pattern, and `-e .` matches any turn that has text; a turn with none (an empty
-tool result) is not seen, so a session whose only turns in the period were such
-results is missed.
+per session, so a session counts once however many turns it has. With no
+pattern every turn counts, one with no text (an empty tool result) included, so
+a session whose only turns in the period were such results is still seen.
 
 A project here is a `cwd`: a worktree or a subdirectory is a row of its own. A
 session is filed under one `cwd`, that of the first matching turn `cg` reads
