@@ -15,11 +15,8 @@ concurrency:
 jobs:
   changeset:
     name: changeset
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-changeset') }}
     runs-on: ubuntu-26.04
     timeout-minutes: 10
-    env:
-      BASE_REF: ${{ github.base_ref }}
     steps:
       - name: Check out code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,13 +24,4 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # Without one, a change to src/ never reaches npm: the release workflow only
-      # opens a version PR for a pending changeset.
-      - name: Require a changeset when src/ changes
-        run: |
-          files=$(git diff --name-only "origin/$BASE_REF"...HEAD)
-          added=$(git diff --name-only --diff-filter=A "origin/$BASE_REF"...HEAD)
-          printf '%s\n' "$files" | grep -q '^src/' || exit 0
-          printf '%s\n' "$added" | grep -q '^\.changeset/.*\.md$' && exit 0
-          echo "::error::src/ changed without a new changeset. Run 'pnpm exec changeset' (or 'pnpm exec changeset --empty' if nothing ships) and commit the file, or label the PR skip-changeset."
-          exit 1
+      - uses: nemolize/actions/changeset@5d31663b9013a671ff8fe8b84900a88b9878f0c1 # v1.5.0
