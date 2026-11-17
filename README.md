@@ -74,7 +74,10 @@ $ npx @nemolize/cg "auth flow"
   per surface: a search includes them, a `--session` dump excludes them; see
   [Subagent turns](#subagent-turns). `--include-subagents` is a deprecated alias
   for `--subagents=include`.
-- `--role <user|assistant|any>` — restrict by turn role (default: `any`).
+- `--role <user|assistant|human|any>` — restrict by turn role (default: `any`).
+  Claude Code records tool results as `user` turns, so `user` also returns tool
+  output. `human` keeps only `user` turns that carry text, not tool output — see
+  [Telling typed text from tool output](#telling-typed-text-from-tool-output).
 - `--since <dur|date>` / `--until <dur|date>` — time window. Accepts a relative
   duration (`7d`, `2h`, `30m`, `1w`) or an absolute date (`2026-06-01`).
 - `--cwd <substring>` — restrict to sessions whose working directory matches.
@@ -137,7 +140,7 @@ read that session to recover the reasoning. `--session` covers the second step �
 it prints a session as a conversation instead of searching across all of them:
 
 ```
-$ cg --session a1b2c3d4 --role user
+$ cg --session a1b2c3d4 --role human
 session a1b2c3d4-5e6f-7890-abcd-ef1234567890  ~/proj-a  (main)
 
 user  2026-07-10 21:30
@@ -155,7 +158,7 @@ user  2026-07-10 21:34
 - The pattern is optional. Give one anyway to keep only the turns that match it,
   with the match highlighted; the whole turn is shown either way, since `-C N`
   windows are for scanning search hits, not for reading a conversation.
-- The other filters compose: `--role user` shows just the asks, `--since` trims
+- The other filters compose: `--role human` shows just the asks, `--since` trims
   a long session to its recent stretch.
 - `--json` emits the same per-hit objects as a search, so a dump pipes to `jq`
   the same way.
@@ -188,7 +191,7 @@ includes them, a `--session` dump excludes them:
 
 - `include` — search's default. Everything the session produced.
 - `exclude` — what you want when reconstructing what the human actually asked,
-  since `--role user` alone still mixes in every orchestrator prompt.
+  since `--role human` alone still mixes in every orchestrator prompt.
 - `only` — what you want when auditing what a fan-out did.
 
 `--json` names the relation rather than leaving it to be inferred from the file
@@ -196,6 +199,27 @@ path: `isSubagent`, plus `agentId` on a subagent hit and `parentSessionId`
 whenever the transcript recorded a parent. A handful of old Codex rollouts
 recorded none; there `sessionId` is the thread's own id and `parentSessionId` is
 absent rather than repeating it.
+
+## Telling typed text from tool output
+
+`--json` carries `contentKinds` on every hit: the kinds of content the turn
+holds, each once, in the order they first appear — any of `text`, `thinking`,
+`tool_use`, `tool_result`, `image`. A Claude line can mix blocks, so a `user`
+turn may list `["tool_result", "text"]`. Codex's kinds follow the record type:
+messages are `text`, `reasoning` is `thinking`, calls are `tool_use`, and call
+outputs are `tool_result`.
+
+`--role human` keeps a turn only when its `role` is `user`, it is not `isMeta`,
+and `contentKinds` includes `text`; `--role user` is unchanged. It is still not
+strictly "what the human typed":
+
+- subagent orchestrator prompts count as `user` text — add `--subagents exclude`;
+- text Claude Code injects itself — background-task completion notices,
+  scheduled or plugin prompts, the output of a `!` shell command, interrupt
+  markers — is also recorded as `user` text and is not detected;
+- Codex's injected context is likewise not detected.
+
+`--role human` drops `isMeta` turns even with `--include-meta`.
 
 ## Finding which session touched a file
 
@@ -344,7 +368,7 @@ cg "X" -c
 cg "X" -l
 
 # What did I ask about X in the last month?
-cg "X" --role user --since 30d --subagents exclude
+cg "X" --role human --since 30d --subagents exclude
 
 # What did the agents a session spawned actually do with X?
 cg "X" --subagents only
@@ -361,14 +385,14 @@ cg --tool Edit,Write --file src/format.ts --since 7d
 # List the unique sessions that mention X (source included: the id spaces overlap)
 cg "X" --json | jq -r '"\(.source) \(.sessionId)"' | sort -u
 
-# Only Codex sessions, only what the human typed
-cg "X" --source codex --role user
+# Only Codex sessions, user turns carrying text (not tool output)
+cg "X" --source codex --role human
 
 # What did a Codex session search the web for?
 cg "X" --tool web_search_call,tool_search_call --source codex
 
 # Find the session that discussed X, then read how it started
-cg "X" --json | jq -r .sessionId | head -1 | xargs -I{} cg --session {} --role user
+cg "X" --json | jq -r .sessionId | head -1 | xargs -I{} cg --session {} --role human
 ```
 
 ## Exit status

@@ -1,6 +1,6 @@
 import { isRecord } from "./guards.js";
 import { renderToolInput, renderValue, TOOL_MARK } from "./textExtract.js";
-import type { ToolCall, ToolResult, Turn } from "./types.js";
+import type { ContentKind, ToolCall, ToolResult, Turn } from "./types.js";
 
 /**
  * Codex records `cwd` only on `session_meta` / `turn_context`, so a parser
@@ -205,6 +205,7 @@ export function parseCodexLine(
   let textLines: string[];
   let toolCalls: ToolCall[] = [];
   let toolResults: ToolResult[] = [];
+  let contentKind: ContentKind;
 
   switch (payload["type"]) {
     case "message": {
@@ -213,12 +214,14 @@ export function parseCodexLine(
       role = kind.role;
       isMeta = kind.isMeta;
       textLines = collectMessageText(payload["content"]);
+      contentKind = "text";
       break;
     }
     case "agent_message": {
       role = "assistant";
       isMeta = false;
       textLines = collectMessageText(payload["content"]);
+      contentKind = "text";
       break;
     }
     case "custom_tool_call":
@@ -229,6 +232,7 @@ export function parseCodexLine(
       isMeta = false;
       textLines = call.textLines;
       toolCalls = [call.toolCall];
+      contentKind = "tool_use";
       break;
     }
     case "web_search_call":
@@ -239,12 +243,14 @@ export function parseCodexLine(
       isMeta = false;
       textLines = call.textLines;
       toolCalls = [call.toolCall];
+      contentKind = "tool_use";
       break;
     }
     case "reasoning": {
       role = "assistant";
       isMeta = false;
       textLines = readReasoning(payload);
+      contentKind = "thinking";
       break;
     }
     case "custom_tool_call_output":
@@ -255,6 +261,7 @@ export function parseCodexLine(
       // Codex records no outcome, so `isError` stays `null` rather than guessing
       // from the paired call's `status`, which is `completed` even for failures.
       toolResults = [readToolResult(payload)];
+      contentKind = "tool_result";
       break;
     }
     default:
@@ -282,5 +289,6 @@ export function parseCodexLine(
     textLines,
     toolCalls,
     toolResults,
+    contentKinds: [contentKind],
   };
 }

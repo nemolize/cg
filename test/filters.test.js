@@ -11,6 +11,7 @@ function turn(over) {
     isSidechain: false,
     textLines: ["hi"],
     toolCalls: [],
+    contentKinds: ["text"],
     ...over,
   };
 }
@@ -46,6 +47,30 @@ test("role filter", () => {
   ).toBe(false);
   expect(
     passesFilters(turn({ role: "assistant" }), opts({ role: "any" })),
+  ).toBe(true);
+});
+
+test("--role human keeps typed text, drops tool-result-only and meta lines", () => {
+  const human = opts({ role: "human" });
+  expect(passesFilters(turn(), human)).toBe(true);
+  expect(passesFilters(turn({ contentKinds: ["tool_result"] }), human)).toBe(
+    false,
+  );
+  expect(
+    passesFilters(turn({ contentKinds: ["tool_result", "text"] }), human),
+  ).toBe(true);
+  expect(
+    passesFilters(turn({ isMeta: true }), { ...human, includeMeta: true }),
+  ).toBe(false);
+  expect(passesFilters(turn({ role: "assistant" }), human)).toBe(false);
+});
+
+test("--role user still returns a tool-result-only line", () => {
+  expect(
+    passesFilters(
+      turn({ contentKinds: ["tool_result"] }),
+      opts({ role: "user" }),
+    ),
   ).toBe(true);
 });
 

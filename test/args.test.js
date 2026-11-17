@@ -85,6 +85,9 @@ test("--role validation", () => {
   expect(parse(["p", "--role", "bogus"]).kind).toBe("error");
   const r = parse(["p", "--role", "user"]);
   if (r.kind === "options") expect(r.options.role).toBe("user");
+  const human = parse(["p", "--role", "human"]);
+  expect(human.kind).toBe("options");
+  if (human.kind === "options") expect(human.options.role).toBe("human");
 });
 
 test("--since relative duration", () => {

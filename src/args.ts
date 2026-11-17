@@ -42,7 +42,10 @@ Filters:
                                 Scope subagent turns (default: include when
                                 searching, exclude in a --session dump)
   --include-subagents           Deprecated alias for --subagents=include
-  --role <user|assistant|any>   Restrict by turn role (default: any)
+  --role <user|assistant|human|any>
+                                Restrict by turn role (default: any); human =
+                                user turns carrying text, not tool output
+                                (Claude/Codex-injected text still counts)
   --since <dur|date>            Only turns at/after (e.g. 7d, 2h, 2026-06-01)
   --until <dur|date>            Only turns at/before
   --cwd <substring>             Restrict to sessions whose cwd matches
@@ -52,6 +55,7 @@ Filters:
   --file <substring>            Only turns whose tool call targets a matching
                                 path (file_path / notebook_path)
   --include-meta                Include isMeta (skill/system) turns
+                                (--role human still drops them)
 
 Context & output:
   -C, --context <N>    Lines of context around each match (default: 2)
@@ -71,9 +75,9 @@ Examples:
   cg "auth flow"                                  Search every transcript
   cg "auth flow" -c                               How many hits? (survey first)
   cg "auth flow" -l                               Which sessions mention it?
-  cg "auth flow" --role user --subagents exclude  Only what the human asked
+  cg "auth flow" --role human --subagents exclude What the human asked, mostly
   cg "auth flow" --since 30d -m 20                Recent, capped at 20 hits
-  cg --session a1b2c3d4 --role user               Read one session's asks
+  cg --session a1b2c3d4 --role human              Read one session's asks
   cg "auth flow" --source codex                   Only Codex transcripts
 
 A broad pattern can match thousands of turns and print megabytes. Survey with
@@ -196,9 +200,12 @@ export function parseArgs(
     roleValue !== undefined &&
     roleValue !== "user" &&
     roleValue !== "assistant" &&
+    roleValue !== "human" &&
     roleValue !== "any"
   ) {
-    return err(`--role must be one of user|assistant|any (got "${roleValue}")`);
+    return err(
+      `--role must be one of user|assistant|human|any (got "${roleValue}")`,
+    );
   }
   const role: RoleFilter = roleValue ?? "any";
 

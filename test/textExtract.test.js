@@ -328,3 +328,75 @@ test("results are listed in source order across one content array", () => {
 test("a value JSON cannot serialise renders as nothing rather than throwing", () => {
   expect(renderValue(1n)).toBe("");
 });
+
+test("contentKinds lists each kind once, in first-appearance order", () => {
+  const { contentKinds } = extractContent([
+    { type: "tool_result", tool_use_id: "a", content: "out" },
+    { type: "text", text: "typed" },
+    { type: "tool_result", tool_use_id: "b", content: "more" },
+    { type: "thinking", thinking: "hmm" },
+    { type: "tool_use", id: "c", name: "Read", input: {} },
+    { type: "image", source: {} },
+    { type: "text", text: "again" },
+  ]);
+  expect(contentKinds).toStrictEqual([
+    "tool_result",
+    "text",
+    "thinking",
+    "tool_use",
+    "image",
+  ]);
+});
+
+test("a plain string is text", () => {
+  expect(extractContent("hello").contentKinds).toStrictEqual(["text"]);
+});
+
+test("a tool result's own text is not the turn's text", () => {
+  const { contentKinds } = extractContent([
+    { type: "tool_result", tool_use_id: "a", content: "out" },
+    {
+      type: "tool_result",
+      tool_use_id: "b",
+      content: [{ type: "text", text: "x" }],
+    },
+  ]);
+  expect(contentKinds).toStrictEqual(["tool_result"]);
+});
+
+test("an empty result body still counts as a tool_result; empty text does not", () => {
+  expect(
+    extractContent([
+      { type: "tool_result", tool_use_id: "a", content: "" },
+      { type: "text", text: "" },
+    ]).contentKinds,
+  ).toStrictEqual(["tool_result"]);
+});
+
+test("an unrecognised block contributes no kind", () => {
+  expect(
+    extractContent([{ type: "mystery", text: "hi" }]).contentKinds,
+  ).toStrictEqual([]);
+});
+
+test("an empty or non-string thinking block contributes no kind", () => {
+  expect(
+    extractContent([
+      { type: "thinking", thinking: "" },
+      { type: "thinking", thinking: 7 },
+      { type: "thinking" },
+    ]).contentKinds,
+  ).toStrictEqual([]);
+});
+
+test("a thinking block echoed inside a tool result is data, not the turn's thinking", () => {
+  expect(
+    extractContent([
+      {
+        type: "tool_result",
+        tool_use_id: "a",
+        content: [{ type: "thinking", thinking: "echo" }],
+      },
+    ]).contentKinds,
+  ).toStrictEqual(["tool_result"]);
+});
