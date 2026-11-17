@@ -424,23 +424,18 @@ test("loadTurns flags a local-command record only when the whole string is one o
       [out("local-command-stdout"), true],
       [out("local-command-stderr", "boom\nmore"), true],
       [out("local-command-stdout", ""), true],
-      [out("bash-stdout", "ok"), true],
-      [out("bash-stdout", "ok") + out("bash-stderr", ""), true],
-      [out("bash-stdout", "ok") + out("bash-stderr", "warn"), true],
       [command(""), true],
       [command("", "/mcp").replaceAll("\n            ", ""), true],
       [command("why did this fail?"), false],
       [out("bash-input", " railway login"), false],
-      [out("bash-stderr", "alone"), false],
       [`see ${out("local-command-stdout")}`, false],
       [`${out("local-command-stdout")} thanks`, false],
       [`${out("local-command-stdout")}\n`, false],
       [out("local-command-stdout") + out("local-command-stdout"), false],
-      [out("bash-stderr", "x") + out("bash-stdout", "y"), false],
-      [out("bash-stdout", "a") + out("bash-stdout", "b"), false],
       [`${command("")}\nextra`, false],
       [command("").replace("<command-args></command-args>", ""), false],
       [command("").replace("/clear", "<b>"), false],
+      [out("bash-stdout", "ok"), false],
     ];
     const text = (t) => ({ type: "text", text: t });
     await writeFile(
@@ -462,6 +457,53 @@ test("loadTurns flags a local-command record only when the whole string is one o
     const turns = [];
     for await (const t of loadTurns(file)) turns.push(t);
     expect(turns.map((t) => t.isInjectedText)).toEqual([
+      ...cases.map(([, flagged]) => flagged),
+      false,
+      false,
+    ]);
+  });
+});
+
+test("loadTurns flags a `!` output record only when the whole string is one bash-stdout element, optionally followed by one bash-stderr", async () => {
+  await withTempDir(async (dir) => {
+    const file = join(dir, "s.jsonl");
+    const out = (tag, body = "done") => `<${tag}>${body}</${tag}>`;
+    const cases = [
+      [out("bash-stdout", "ok"), true],
+      [out("bash-stdout", ""), true],
+      [out("bash-stdout", "a\nb"), true],
+      [out("bash-stdout", "ok") + out("bash-stderr", ""), true],
+      [out("bash-stdout", "ok") + out("bash-stderr", "warn"), true],
+      [out("bash-input", " railway login"), false],
+      [out("bash-stderr", "alone"), false],
+      [out("bash-stderr", "x") + out("bash-stdout", "y"), false],
+      [out("bash-stdout", "a") + out("bash-stdout", "b"), false],
+      [`see ${out("bash-stdout", "ok")}`, false],
+      [`${out("bash-stdout", "ok")} thanks`, false],
+      [`${out("bash-stdout", "ok")}\n`, false],
+      [out("bash-stdout", "ok") + "\n" + out("bash-stderr", "warn"), false],
+      [out("local-command-stdout"), false],
+    ];
+    const text = (t) => ({ type: "text", text: t });
+    await writeFile(
+      file,
+      [
+        ...cases.map(([content]) =>
+          JSON.stringify({ type: "user", message: { content } }),
+        ),
+        JSON.stringify({
+          type: "user",
+          message: { content: [text(out("bash-stdout", "ok"))] },
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { content: out("bash-stdout", "ok") },
+        }),
+      ].join("\n") + "\n",
+    );
+    const turns = [];
+    for await (const t of loadTurns(file)) turns.push(t);
+    expect(turns.map((t) => t.isBashOutput)).toEqual([
       ...cases.map(([, flagged]) => flagged),
       false,
       false,

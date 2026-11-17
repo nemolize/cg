@@ -88,6 +88,7 @@ function passesRole(turn: Turn, opts: Options): boolean {
       turn.role === "user" &&
       !turn.isMeta &&
       turn.contentKinds.includes("text") &&
+      turn.isBashOutput !== true &&
       !(
         turn.origin === undefined &&
         turn.turnOrigin === undefined &&

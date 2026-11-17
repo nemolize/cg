@@ -1,6 +1,11 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { expect, test } from "vitest";
 
 import { passesFilters } from "../src/filters.js";
+import { loadTurns } from "../src/loader.js";
 
 function turn(over) {
   return {
@@ -263,4 +268,62 @@ test("--role human drops injected text that records no origin, unless origin say
   expect(passesFilters({ ...injected, turnOrigin: "human" }, human)).toBe(true);
   expect(passesFilters(turn({ isInjectedText: false }), human)).toBe(true);
   expect(passesFilters(injected, opts({ role: "user" }))).toBe(true);
+});
+
+test("--role human drops `!` output whatever origin it records, and keeps other lines with the same origin", () => {
+  const human = opts({ role: "human" });
+  const bash = turn({ isBashOutput: true });
+  for (const origins of [
+    {},
+    { origin: "human" },
+    { turnOrigin: "human" },
+    { origin: "human", turnOrigin: "human" },
+    { origin: "plugin" },
+    { origin: "human", turnOrigin: "system" },
+  ]) {
+    expect(passesFilters({ ...bash, ...origins }, human)).toBe(false);
+  }
+  expect(passesFilters(turn({ isBashOutput: false }), human)).toBe(true);
+  expect(passesFilters(bash, opts({ role: "user" }))).toBe(true);
+  expect(passesFilters(bash, opts({ role: "any" }))).toBe(true);
+});
+
+test("--role human keeps a human-recorded local-command record", () => {
+  const human = opts({ role: "human" });
+  const record = turn({ isInjectedText: true, turnOrigin: "human" });
+  expect(passesFilters(record, human)).toBe(true);
+  expect(passesFilters({ ...record, turnOrigin: undefined }, human)).toBe(
+    false,
+  );
+});
+
+test("a transcript's `!` output line recording turnOrigin human is dropped by --role human after loading", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "cg-test-"));
+  try {
+    const file = join(dir, "s.jsonl");
+    const user = (content, extra) =>
+      JSON.stringify({ type: "user", message: { content }, ...extra });
+    await writeFile(
+      file,
+      [
+        user("<bash-input>ls</bash-input>", { turnOrigin: "human" }),
+        user("<bash-stdout>a b</bash-stdout><bash-stderr></bash-stderr>", {
+          turnOrigin: "human",
+        }),
+        user("<bash-stdout>c</bash-stdout>", { origin: { kind: "human" } }),
+        user("<bash-stdout>d</bash-stdout>"),
+        user("what did that print?", { turnOrigin: "human" }),
+      ].join("\n") + "\n",
+    );
+    const kept = [];
+    for await (const t of loadTurns(file)) {
+      if (passesFilters(t, opts({ role: "human" }))) kept.push(t.textLines[0]);
+    }
+    expect(kept).toEqual([
+      "<bash-input>ls</bash-input>",
+      "what did that print?",
+    ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

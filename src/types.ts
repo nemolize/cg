@@ -45,6 +45,7 @@ export interface Turn {
   turnOrigin?: string | undefined;
   /** Claude `user` text Claude Code injected: forwarded message, interrupt marker, local-command record. */
   isInjectedText?: boolean | undefined;
+  isBashOutput?: boolean | undefined;
   /** Claude's `message.id`, shared by every line of one assistant reply; absent on lines without one and on Codex. */
   messageId?: string | undefined;
   /**
