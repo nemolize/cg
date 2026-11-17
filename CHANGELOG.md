@@ -1,5 +1,11 @@
 # @nemolize/cc-grep
 
+## 0.9.0
+
+### Minor Changes
+
+- [#213](https://github.com/nemolize/cg/pull/213) [`347c1d1`](https://github.com/nemolize/cg/commit/347c1d1f4de2b94ef01de4d3db763cc089be5c91) - A Codex tool call's input is now rendered like a Claude `tool_use`: a `⚙ <name>` line, then one `key: value` line per key, so any field is searchable and the matched line says which key hit. This covers `function_call` and `tool_search_call` arguments and every `web_search_call` action, so `open_page` and `find_in_page` calls are now collected too. A `function_call` whose arguments are empty or not an object is kept rather than dropped.
+
 ## 0.8.0
 
 ### Minor Changes
