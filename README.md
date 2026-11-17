@@ -324,6 +324,54 @@ Codex has no `messageId`: its records carry no reply-level id. A record's own
 `id` names that record, and the `turn_id` its rollouts share spans a whole
 turn — several model steps — so it is not exposed.
 
+## Aggregating with jq
+
+`cg` finds and prints records; counting them is left to `jq`, so the recipes
+below pipe `--json` through it. Each names what it measures, because a count
+that reads like something bigger is the usual mistake.
+
+### Sessions active per project
+
+```sh
+cg -e . --since 30d -l --json | jq -s '
+  group_by(.cwd)
+  | map({cwd: .[0].cwd, sessionsActive: length})
+  | sort_by(-.sessionsActive)'
+```
+
+`sessionsActive` is the number of sessions with at least one turn in the period
+— not sessions started in it, time spent, or a rate. `-l --json` prints one line
+per session, so a session counts once however many turns it has. `cg` needs a
+pattern, and `-e .` matches any turn that has text; a turn with none (an empty
+tool result) is not seen, so a session whose only turns in the period were such
+results is missed.
+
+A session is filed under the `cwd` of its first matching turn, so one that
+changed directory is not counted twice. A line with no recorded `cwd` groups
+under `null`. Subagent turns belong to their parent's session; add
+`--subagents exclude` to leave them out.
+
+### Edit attempts per file
+
+```sh
+cg --tool Edit,Write --source claude --since 30d --json | jq -s '
+  [.[].toolCalls[]? | select(.name | IN("Edit", "Write")) | .paths[]]
+  | group_by(.)
+  | map({file: .[0], attempts: length})
+  | sort_by(-.attempts)'
+```
+
+`attempts` is the number of `Edit` and `Write` calls that targeted the file —
+not edits that landed. A call that failed on a stale `old_string` is counted;
+whether one landed is in the paired result (`toolResults`, see
+[Finding which session touched a file](#finding-which-session-touched-a-file)).
+
+`--tool` keeps a whole turn that made one of those calls, and a turn can carry
+others, such as a `Read` of another file. The `select` repeats the filter on
+each call, so only the named ones are counted; `jq` compares names exactly, where
+`--tool` ignores case. Add `MultiEdit` or `NotebookEdit` to both lists to count
+them. `--source claude` is there because a Codex call records no path.
+
 ## Codex support
 
 Codex transcripts are searched alongside Claude's by default, and a Codex hit is
@@ -417,6 +465,9 @@ cg "X" --tool web_search_call,tool_search_call --source codex
 # Find the session that discussed X, then read how it started
 cg "X" --json | jq -r .sessionId | head -1 | xargs -I{} cg --session {} --role human
 ```
+
+Counting rather than finding — sessions active per project, edit attempts per
+file — is in [Aggregating with jq](#aggregating-with-jq).
 
 ## Exit status
 

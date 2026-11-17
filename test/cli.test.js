@@ -672,3 +672,115 @@ test("--json carries messageId so the lines of one reply group in jq", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// The README's `jq` programs are run as written: a test of a copy would stay
+// green while the documented text drifted.
+function readmeJq(heading) {
+  const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
+  const section = readme.slice(readme.indexOf(`### ${heading}\n`));
+  const match = /\| jq (-\w+ )?'([^']*)'/.exec(section);
+  if (match === null) throw new Error(`no jq recipe under "${heading}"`);
+  return { flags: match[1]?.trim(), program: match[2] };
+}
+
+function pipeThroughJq({ flags, program }, input) {
+  return JSON.parse(
+    execFileSync("jq", [...(flags === undefined ? [] : [flags]), program], {
+      encoding: "utf8",
+      input,
+    }),
+  );
+}
+
+test("the sessions-active recipe counts sessions, not turns, per project", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
+  const turn = (sessionId, cwd, timestamp) =>
+    JSON.stringify({
+      type: "user",
+      sessionId,
+      timestamp,
+      cwd,
+      message: { content: "hello" },
+    });
+  writeFileSync(
+    join(dir, "a.jsonl"),
+    [
+      turn("s1", "/proj-a", "2026-07-10T00:00:00Z"),
+      turn("s1", "/proj-a", "2026-07-20T00:00:00Z"),
+      turn("s2", "/proj-a", "2026-07-15T00:00:00Z"),
+      turn("s3", "/proj-b", "2026-07-12T00:00:00Z"),
+      turn("s4", "/proj-b", "2026-06-01T00:00:00Z"),
+    ].join("\n"),
+  );
+  try {
+    const out = runCli([
+      "-e",
+      ".",
+      "--root",
+      dir,
+      "--since",
+      "2026-07-01",
+      "-l",
+      "--json",
+    ]);
+    expect(
+      pipeThroughJq(readmeJq("Sessions active per project"), out),
+    ).toStrictEqual([
+      { cwd: "/proj-a", sessionsActive: 2 },
+      { cwd: "/proj-b", sessionsActive: 1 },
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the edit-attempts recipe counts Edit and Write calls per file, not the other calls in a turn", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
+  const call = (name, file) => ({
+    type: "tool_use",
+    id: `${name}-${file}`,
+    name,
+    input: { file_path: file },
+  });
+  const turn = (sessionId, blocks) =>
+    JSON.stringify({
+      type: "assistant",
+      sessionId,
+      timestamp: "2026-07-10T00:00:00Z",
+      cwd: "/proj",
+      message: { content: blocks },
+    });
+  // y.ts is read in a turn that also edits x.ts: --tool keeps the turn, so
+  // only the recipe's own filter drops the Read.
+  writeFileSync(
+    join(dir, "a.jsonl"),
+    [
+      turn("s1", [call("Edit", "/proj/x.ts"), call("Read", "/proj/y.ts")]),
+      turn("s1", [call("Write", "/proj/x.ts")]),
+      turn("s2", [call("Edit", "/proj/x.ts")]),
+      turn("s2", [call("Edit", "/proj/z.ts"), call("Edit", "/proj/z.ts")]),
+      turn("s3", [call("Write", "/proj/w.ts")]),
+      turn("s3", [call("Grep", "/proj/x.ts")]),
+    ].join("\n"),
+  );
+  try {
+    const out = runCli([
+      "--tool",
+      "Edit,Write",
+      "--source",
+      "claude",
+      "--root",
+      dir,
+      "--json",
+    ]);
+    expect(
+      pipeThroughJq(readmeJq("Edit attempts per file"), out),
+    ).toStrictEqual([
+      { file: "/proj/x.ts", attempts: 3 },
+      { file: "/proj/z.ts", attempts: 2 },
+      { file: "/proj/w.ts", attempts: 1 },
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
