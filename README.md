@@ -76,7 +76,7 @@ $ npx @nemolize/cg "auth flow"
   for `--subagents=include`.
 - `--role <user|assistant|human|any>` — restrict by turn role (default: `any`).
   Claude Code records tool results as `user` turns, so `user` also returns tool
-  output. `human` keeps only `user` turns that carry typed text — see
+  output. `human` keeps only `user` turns that carry text, not tool output — see
   [Telling typed text from tool output](#telling-typed-text-from-tool-output).
 - `--since <dur|date>` / `--until <dur|date>` — time window. Accepts a relative
   duration (`7d`, `2h`, `30m`, `1w`) or an absolute date (`2026-06-01`).
@@ -194,7 +194,13 @@ includes them, a `--session` dump excludes them:
   since `--role human` alone still mixes in every orchestrator prompt.
 - `only` — what you want when auditing what a fan-out did.
 
-### Telling typed text from tool output
+`--json` names the relation rather than leaving it to be inferred from the file
+path: `isSubagent`, plus `agentId` on a subagent hit and `parentSessionId`
+whenever the transcript recorded a parent. A handful of old Codex rollouts
+recorded none; there `sessionId` is the thread's own id and `parentSessionId` is
+absent rather than repeating it.
+
+## Telling typed text from tool output
 
 `--json` carries `contentKinds` on every hit: the kinds of content the turn
 holds, each once, in the order they first appear — any of `text`, `thinking`,
@@ -208,13 +214,12 @@ and `contentKinds` includes `text`; `--role user` is unchanged. It is still not
 strictly "what the human typed":
 
 - subagent orchestrator prompts count as `user` text — add `--subagents exclude`;
-- Codex's injected context is also recorded as `user` text and is not detected.
+- text Claude Code injects itself — background-task completion notices,
+  scheduled or plugin prompts, the output of a `!` shell command, interrupt
+  markers — is also recorded as `user` text and is not detected;
+- Codex's injected context is likewise not detected.
 
-`--json` names the relation rather than leaving it to be inferred from the file
-path: `isSubagent`, plus `agentId` on a subagent hit and `parentSessionId`
-whenever the transcript recorded a parent. A handful of old Codex rollouts
-recorded none; there `sessionId` is the thread's own id and `parentSessionId` is
-absent rather than repeating it.
+`--role human` drops `isMeta` turns even with `--include-meta`.
 
 ## Finding which session touched a file
 
@@ -380,7 +385,7 @@ cg --tool Edit,Write --file src/format.ts --since 7d
 # List the unique sessions that mention X (source included: the id spaces overlap)
 cg "X" --json | jq -r '"\(.source) \(.sessionId)"' | sort -u
 
-# Only Codex sessions, only what the human typed
+# Only Codex sessions, user turns carrying text (not tool output)
 cg "X" --source codex --role human
 
 # What did a Codex session search the web for?

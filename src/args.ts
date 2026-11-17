@@ -44,7 +44,8 @@ Filters:
   --include-subagents           Deprecated alias for --subagents=include
   --role <user|assistant|human|any>
                                 Restrict by turn role (default: any); human =
-                                user turns carrying typed text, not tool output
+                                user turns carrying text, not tool output
+                                (Claude/Codex-injected text still counts)
   --since <dur|date>            Only turns at/after (e.g. 7d, 2h, 2026-06-01)
   --until <dur|date>            Only turns at/before
   --cwd <substring>             Restrict to sessions whose cwd matches
@@ -54,6 +55,7 @@ Filters:
   --file <substring>            Only turns whose tool call targets a matching
                                 path (file_path / notebook_path)
   --include-meta                Include isMeta (skill/system) turns
+                                (--role human still drops them)
 
 Context & output:
   -C, --context <N>    Lines of context around each match (default: 2)
@@ -73,7 +75,7 @@ Examples:
   cg "auth flow"                                  Search every transcript
   cg "auth flow" -c                               How many hits? (survey first)
   cg "auth flow" -l                               Which sessions mention it?
-  cg "auth flow" --role human --subagents exclude Only what the human asked
+  cg "auth flow" --role human --subagents exclude What the human asked, mostly
   cg "auth flow" --since 30d -m 20                Recent, capped at 20 hits
   cg --session a1b2c3d4 --role human              Read one session's asks
   cg "auth flow" --source codex                   Only Codex transcripts
