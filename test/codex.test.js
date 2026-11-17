@@ -385,7 +385,14 @@ test.each([
     [`${TOOL_MARK} shell`, "a", "b"],
   ],
   ["a parsed number is one line", "7", [`${TOOL_MARK} shell`, "7"]],
-  ["a parsed null is one line", "null", [`${TOOL_MARK} shell`, "null"]],
+  ["a parsed null renders no line", "null", [`${TOOL_MARK} shell`]],
+  ["absent arguments render no line", undefined, [`${TOOL_MARK} shell`]],
+  ["an empty record renders no line", "{}", [`${TOOL_MARK} shell`]],
+  [
+    "a key whose value is null renders as key: null",
+    '{"cmd":null}',
+    [`${TOOL_MARK} shell`, "cmd: null"],
+  ],
   [
     "an unparseable string stays raw",
     "{not json",
@@ -405,16 +412,14 @@ test.each([
   },
 );
 
-test("a nameless function call still yields a turn for empty-record arguments", async () => {
+test("a nameless function call with empty-record arguments yields no turn", async () => {
   const line = JSON.stringify({
     timestamp: "2026-09-14T04:01:30.000Z",
     type: "response_item",
     payload: { type: "function_call", arguments: "{}" },
   });
   await withCodexFile([meta(), line], (turns) => {
-    expect(turns).toHaveLength(1);
-    expect(turns[0].textLines).toEqual(["{}"]);
-    expect(turns[0].toolCalls).toEqual([{ name: "", paths: [], input: {} }]);
+    expect(turns).toHaveLength(0);
   });
 });
 

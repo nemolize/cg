@@ -194,6 +194,17 @@ test("a tool call carries its input verbatim", () => {
   expect(toolCalls[0].input).toStrictEqual(input);
 });
 
+test.each([
+  ["null input", { input: null }, []],
+  ["absent input", {}, []],
+  ["an empty record", { input: {} }, []],
+  ["a key whose value is null", { input: { cmd: null } }, ["cmd: null"]],
+])("tool_use renders %s", (_label, fields, expected) => {
+  expect(
+    extractTextLines([{ type: "tool_use", name: "Bash", ...fields }]),
+  ).toEqual(["⚙ Bash", ...expected]);
+});
+
 test("a tool call with no input omits the key", () => {
   const { toolCalls } = extractContent([{ type: "tool_use", name: "Noop" }]);
   expect(toolCalls).toEqual([{ name: "Noop", paths: [] }]);

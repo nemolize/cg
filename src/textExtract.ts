@@ -99,24 +99,31 @@ function collectToolUse(
   const name = typeof block["name"] === "string" ? block["name"] : "";
   if (name !== "") out.push(`${TOOL_MARK} ${name}`);
 
-  const paths: string[] = [];
   const input = block["input"];
-  if (isRecord(input)) {
-    for (const [key, value] of Object.entries(input)) {
-      out.push(`${key}: ${renderValue(value, 0)}`);
-      if (PATH_FIELDS.has(key) && typeof value === "string" && value !== "") {
-        paths.push(value);
-      }
-    }
-  } else if (input != null) {
-    out.push(renderValue(input, 0));
-  }
+  out.push(...renderToolInput(input));
+  const paths = isRecord(input)
+    ? Object.entries(input).flatMap(([key, value]) =>
+        PATH_FIELDS.has(key) && typeof value === "string" && value !== ""
+          ? [value]
+          : [],
+      )
+    : [];
 
   // A nameless, pathless call matches neither filter and would only render as
   // an empty `[]` label.
   if (name !== "" || paths.length > 0) {
     toolCalls?.push({ name, paths, ...(input != null ? { input } : {}) });
   }
+}
+
+export function renderToolInput(input: unknown): string[] {
+  if (input == null) return [];
+  const lines = isRecord(input)
+    ? Object.entries(input).map(
+        ([key, value]) => `${key}: ${renderValue(value)}`,
+      )
+    : [renderValue(input)];
+  return lines.flatMap((line) => line.split("\n"));
 }
 
 /**

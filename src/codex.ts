@@ -1,5 +1,5 @@
 import { isRecord } from "./guards.js";
-import { renderValue, TOOL_MARK } from "./textExtract.js";
+import { renderToolInput, renderValue, TOOL_MARK } from "./textExtract.js";
 import type { ToolCall, Turn } from "./types.js";
 
 /**
@@ -76,19 +76,6 @@ function withInput(name: string, input: unknown): ToolCall {
   return { name, paths: [], ...(input != null ? { input } : {}) };
 }
 
-function renderRecord(record: Record<string, unknown>): string[] {
-  return Object.entries(record).flatMap(([key, value]) =>
-    `${key}: ${renderValue(value)}`.split("\n"),
-  );
-}
-
-function renderInput(input: unknown): string[] {
-  if (isRecord(input) && Object.keys(input).length > 0)
-    return renderRecord(input);
-  if (input === undefined) return [];
-  return renderValue(input).split("\n");
-}
-
 /**
  * `paths` stays empty because no argument field is known to hold a path, even
  * once a `function_call`'s JSON is parsed.
@@ -108,7 +95,7 @@ function readToolCall(
     body =
       input === undefined && typeof legacy === "string"
         ? legacy.split("\n")
-        : renderInput(input);
+        : renderToolInput(input);
   } else {
     input = payload["input"];
     const raw = payload["input"] ?? payload["arguments"];
@@ -130,7 +117,7 @@ function readSearchCall(
 
   return {
     toolCall: withInput(name, input),
-    textLines: [`${TOOL_MARK} ${name}`, ...renderRecord(input)],
+    textLines: [`${TOOL_MARK} ${name}`, ...renderToolInput(input)],
   };
 }
 
