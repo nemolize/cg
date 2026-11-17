@@ -226,8 +226,8 @@ and the forwarded-message check below. It is still not strictly "what the human 
 sent a message:` and a `teammate-message`, `agent-message` or
   `cross-session-message` tag is dropped as a forwarded message. This is a text
   heuristic, so a human who pastes the same envelope is dropped too; `--role
-user` shows it. A line that records `human` is kept, and so is any other
-  wrapper;
+user` shows it. A line that records `human` is kept, and so are the same
+  text in array content or after leading whitespace, and any other tag;
 - other Claude lines without an origin field are not detected: older
   transcripts, the output of a `!` shell command, interrupt markers;
 - Codex's injected context is likewise not detected.

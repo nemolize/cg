@@ -79,7 +79,8 @@ function passesSubagentScope(turn: Turn, opts: Options): boolean {
 
 /**
  * `human` keeps typed text only: tool results and Claude-injected text are also
- * `user` lines. No origin field on a line → the text rule alone decides.
+ * `user` lines. No origin field on a line → the text rule and the
+ * forwarded-envelope check decide.
  */
 function passesRole(turn: Turn, opts: Options): boolean {
   if (opts.role === "any") return true;
