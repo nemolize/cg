@@ -16,7 +16,7 @@ export function passesFilters(turn: Turn, opts: Options): boolean {
 
   if (!passesSubagentScope(turn, opts)) return false;
 
-  if (opts.role !== "any" && turn.role !== opts.role) return false;
+  if (!passesRole(turn, opts)) return false;
 
   if (!opts.includeMeta && turn.isMeta) return false;
 
@@ -75,4 +75,18 @@ function passesSubagentScope(turn: Turn, opts: Options): boolean {
     opts.subagents ?? (opts.session === undefined ? "include" : "exclude");
   if (scope === "include") return true;
   return scope === "only" ? turn.isSidechain : !turn.isSidechain;
+}
+
+/**
+ * Claude records tool results as `user` lines, so `user` alone mixes in tool
+ * output; `human` keeps only the lines that carry typed text.
+ */
+function passesRole(turn: Turn, opts: Options): boolean {
+  if (opts.role === "any") return true;
+  if (opts.role === "human") {
+    return (
+      turn.role === "user" && !turn.isMeta && turn.contentKinds.includes("text")
+    );
+  }
+  return turn.role === opts.role;
 }

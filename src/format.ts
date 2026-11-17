@@ -312,6 +312,7 @@ export function formatHitJson(hit: Hit, opts: Options, home: string): string {
     timestamp: turn.timestamp,
     sessionId: turn.sessionId,
     role: turn.role,
+    contentKinds: turn.contentKinds,
     gitBranch: turn.gitBranch,
     isMeta: turn.isMeta,
     isSubagent: turn.isSidechain,

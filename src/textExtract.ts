@@ -1,11 +1,12 @@
 import { isRecord } from "./guards.js";
-import type { ToolCall, ToolResult } from "./types.js";
+import type { ContentKind, ToolCall, ToolResult } from "./types.js";
 
 /** Text lines plus the tool calls `--tool` / `--file` filter on. */
 export interface ExtractedContent {
   textLines: string[];
   toolCalls: ToolCall[];
   toolResults: ToolResult[];
+  contentKinds: ContentKind[];
 }
 
 /**
@@ -23,12 +24,17 @@ export interface ExtractedContent {
  */
 export function extractContent(content: unknown): ExtractedContent {
   const out: string[] = [];
-  const found: Structural = { toolCalls: [], toolResults: [] };
+  const found: Structural = {
+    toolCalls: [],
+    toolResults: [],
+    kinds: new Set(),
+  };
   collect(content, out, 0, found);
   return {
     textLines: out.flatMap((s) => s.split("\n")),
     toolCalls: found.toolCalls,
     toolResults: found.toolResults,
+    contentKinds: [...found.kinds],
   };
 }
 
@@ -42,6 +48,7 @@ const MAX_DEPTH = 8;
 interface Structural {
   toolCalls: ToolCall[];
   toolResults: ToolResult[];
+  kinds: Set<ContentKind>;
 }
 
 function collect(
@@ -53,7 +60,10 @@ function collect(
   if (node == null || depth > MAX_DEPTH) return;
 
   if (typeof node === "string") {
-    if (node.length > 0) out.push(node);
+    if (node.length > 0) {
+      out.push(node);
+      found?.kinds.add("text");
+    }
     return;
   }
 
@@ -69,19 +79,27 @@ function collect(
     case "text":
       collect(block["text"], out, depth + 1, found);
       return;
-    case "thinking":
-      collect(block["thinking"], out, depth + 1, found);
+    case "thinking": {
+      const thinking = block["thinking"];
+      if (typeof thinking === "string" && thinking.length > 0) {
+        found?.kinds.add("thinking");
+      }
+      collect(thinking, out, depth + 1, null);
       return;
+    }
     case "tool_result":
       // A `tool_use` or `tool_result` echoed back inside a result is data, not
       // one the session made, so collection stops here (text still extracts).
       found?.toolResults.push(readToolResult(block));
+      found?.kinds.add("tool_result");
       collect(block["content"], out, depth + 1, null);
       return;
     case "tool_use":
+      found?.kinds.add("tool_use");
       collectToolUse(block, out, found?.toolCalls ?? null);
       return;
     case "image":
+      found?.kinds.add("image");
       return; // no text to search
     default:
       if (typeof block["text"] === "string") out.push(block["text"]);

@@ -125,7 +125,7 @@ function parseClaudeLine(
   if (role !== "user" && role !== "assistant") return undefined;
 
   const message = isRecord(obj["message"]) ? obj["message"] : undefined;
-  const { textLines, toolCalls, toolResults } = extractContent(
+  const { textLines, toolCalls, toolResults, contentKinds } = extractContent(
     message?.["content"],
   );
   if (textLines.length === 0 && toolResults.length === 0) return undefined;
@@ -152,6 +152,7 @@ function parseClaudeLine(
     textLines,
     toolCalls,
     toolResults,
+    contentKinds,
   };
 }
 

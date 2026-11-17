@@ -555,3 +555,48 @@ test("--json links a Codex call to its empty output", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("--json lists contentKinds and --role human drops tool-result-only lines", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
+  const line = (type, content) =>
+    JSON.stringify({
+      type,
+      sessionId: "eeeeeeee-1111-2222-3333-444444444444",
+      timestamp: "2026-07-13T00:00:00Z",
+      cwd: "/proj-e",
+      message: { content },
+    });
+  writeFileSync(
+    join(dir, "e.jsonl"),
+    [
+      line("user", "marker typed by the human"),
+      line("user", [
+        { type: "tool_result", tool_use_id: "t1", content: "marker output" },
+      ]),
+      line("user", [
+        { type: "tool_result", tool_use_id: "t2", content: "marker mixed" },
+        { type: "text", text: "marker typed after a result" },
+      ]),
+    ].join("\n"),
+  );
+  try {
+    const rows = (args) =>
+      runCli(["marker", "--root", dir, "--json", ...args])
+        .trim()
+        .split("\n")
+        .map((l) => JSON.parse(l));
+
+    expect(rows([]).map((r) => r.contentKinds)).toStrictEqual([
+      ["text"],
+      ["tool_result"],
+      ["tool_result", "text"],
+    ]);
+    expect(rows(["--role", "user"])).toHaveLength(3);
+    expect(rows(["--role", "human"]).map((r) => r.contentKinds)).toStrictEqual([
+      ["text"],
+      ["tool_result", "text"],
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

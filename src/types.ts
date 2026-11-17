@@ -15,6 +15,9 @@ export interface ToolResult {
   isError: boolean | null;
 }
 
+export type ContentKind =
+  "text" | "thinking" | "tool_use" | "tool_result" | "image";
+
 /**
  * Normalized view of a single transcript turn (one JSONL line) that survived
  * schema-tolerant parsing. Fields absent in the source line are left undefined
@@ -53,6 +56,8 @@ export interface Turn {
   /** Structural view of the turn's `tool_use` blocks. */
   toolCalls: ToolCall[];
   toolResults: ToolResult[];
+  /** Each kind once, in the order it first appears in the line. */
+  contentKinds: ContentKind[];
 }
 
 /** Agent whose transcripts are being read; each has its own root and schema. */
@@ -67,7 +72,7 @@ export interface ResolvedRoot {
   namedBy?: string | undefined;
 }
 
-export type RoleFilter = "user" | "assistant" | "any";
+export type RoleFilter = "user" | "assistant" | "human" | "any";
 
 export type SubagentScope = "include" | "exclude" | "only";
 

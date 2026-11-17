@@ -130,3 +130,30 @@ test.each(["custom_tool_call_output", "function_call_output"])(
     }
   },
 );
+
+test.each([
+  [{ type: "message", role: "user", content: [{ text: "hi" }] }, "text"],
+  [{ type: "message", role: "assistant", content: [{ text: "hi" }] }, "text"],
+  [{ type: "agent_message", content: [{ text: "hi" }] }, "text"],
+  [{ type: "reasoning", summary: [{ text: "hmm" }] }, "thinking"],
+  [{ type: "function_call", name: "shell", arguments: "{}" }, "tool_use"],
+  [{ type: "custom_tool_call", name: "patch", input: "x" }, "tool_use"],
+  [{ type: "web_search_call", action: { query: "q" } }, "tool_use"],
+  [{ type: "tool_search_call", arguments: { query: "q" } }, "tool_use"],
+  [
+    { type: "function_call_output", call_id: "c", output: "out" },
+    "tool_result",
+  ],
+  [
+    { type: "custom_tool_call_output", call_id: "c", output: "out" },
+    "tool_result",
+  ],
+])("contentKinds follows the Codex record type: %j", (payload, kind) => {
+  const turn = parseCodexLine(
+    "fixture.jsonl",
+    0,
+    JSON.stringify({ type: "response_item", payload }),
+    newCodexFileState(),
+  );
+  expect(turn?.contentKinds).toStrictEqual([kind]);
+});
