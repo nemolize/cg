@@ -236,6 +236,8 @@ tool use]`; a string that is one `<local-command-stdout>` or
   anything that only resembles these forms: another tag or wording, a
   `<bash-input>` line, a command record with arguments, the same text in array
   content or with other text around it;
+- most `!` shell output is kept: Claude Code usually records it with
+  `turnOrigin: human`, and only the lines above that record no origin are dropped;
 - other Claude lines without an origin field are not detected: older
   transcripts;
 - Codex's injected context is likewise not detected.
