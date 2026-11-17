@@ -312,16 +312,17 @@ Claude hit whose line records a string `message.id` carries it as `messageId`,
 so the lines of one reply group in `jq` without merging them:
 
 ```sh
-cg --session <id> --json | jq -s 'group_by(.messageId)'
+cg --session <id> --json | jq -s 'map(select(.messageId != null)) | group_by(.messageId)'
 ```
 
-Lines with no `message.id` (a `user` line has none) omit the key, and `jq`
-groups them under `null` — filter on `.messageId != null` first. A reply is
-complete only if every one of its lines reached the stream, which a pattern
-search does not guarantee; use a `--session` dump for that.
+Lines with no `message.id` (a `user` line has none) omit the key, so the filter
+keeps them out of a `null` group. A pattern search emits only the lines it
+matched, so a reply is whole only in a `--session` dump, and even there a line
+holding nothing but an empty `thinking` block or an image is never emitted.
 
-Codex has no `messageId`: no reply-level id was found there, since each record
-carries an `id` of its own.
+Codex has no `messageId`: its records carry no reply-level id. A record's own
+`id` names that record, and the `turn_id` its rollouts share spans a whole
+turn — several model steps — so it is not exposed.
 
 ## Codex support
 
