@@ -408,11 +408,7 @@ test("loadTurns flags an interrupt marker only as the single text block of a use
     const turns = [];
     for await (const t of loadTurns(file)) turns.push(t);
     expect(turns.map((t) => t.isInjectedText)).toEqual([
-      ...cases
-        .filter(
-          ([content]) => content.length !== 0 || typeof content === "string",
-        )
-        .map(([, flagged]) => flagged),
+      ...cases.map(([, flagged]) => flagged),
       false,
     ]);
   });
