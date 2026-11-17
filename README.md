@@ -219,12 +219,17 @@ and `contentKinds` includes `text`; `--role user` is unchanged. A Claude line
 that records `origin.kind` or `turnOrigin` is also dropped unless that value is
 `human`, which leaves out background-task notices, scheduled and plugin
 prompts, and SDK prompts. A line with neither field is judged by the text rule
-alone. It is still not strictly "what the human typed":
+and the forwarded-message check below. It is still not strictly "what the human typed":
 
 - subagent orchestrator prompts count as `user` text — add `--subagents exclude`;
-- Claude lines without an origin field are not detected: messages from another
-  Claude session in the same team (the largest group on current versions),
-  older transcripts, the output of a `!` shell command, interrupt markers;
+- a Claude line with no origin field whose text starts `Another Claude session
+sent a message:` and a `teammate-message`, `agent-message` or
+  `cross-session-message` tag is dropped as a forwarded message. This is a text
+  heuristic, so a human who pastes the same envelope is dropped too; `--role
+user` shows it. A line that records `human` is kept, and so is any other
+  wrapper;
+- other Claude lines without an origin field are not detected: older
+  transcripts, the output of a `!` shell command, interrupt markers;
 - Codex's injected context is likewise not detected.
 
 `--role human` drops `isMeta` turns even with `--include-meta`.

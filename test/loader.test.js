@@ -338,3 +338,42 @@ test("a Claude line whose only block is an empty tool_result is kept; one with n
     ]);
   });
 });
+
+test("loadTurns flags only a plain-string forwarded envelope at the very start of a user line", async () => {
+  await withTempDir(async (dir) => {
+    const file = join(dir, "s.jsonl");
+    const head = "Another Claude session sent a message:";
+    const line = (content, type = "user") =>
+      JSON.stringify({ type, message: { content } });
+    const cases = [
+      [
+        `${head}\n<teammate-message teammate_id="x">\nhi\n</teammate-message>`,
+        true,
+      ],
+      [`${head}\r\n<agent-message from="a">\nhi`, true],
+      [`${head}\n<cross-session-message from="u">\nhi`, true],
+      [`${head}\n<teammate-message>\nhi`, true],
+      [`  ${head}\n<teammate-message>`, false],
+      [`${head}\nplain text`, false],
+      [`${head}\n<teammate-messages>`, false],
+      [`${head}\n<other-message>`, false],
+      [`note\n${head}\n<teammate-message>`, false],
+      ['<teammate-message teammate_id="team-lead">\nhi', false],
+    ];
+    await writeFile(
+      file,
+      [
+        ...cases.map(([text]) => line(text)),
+        line([{ type: "text", text: `${head}\n<teammate-message>` }]),
+        line(`${head}\n<teammate-message>`, "assistant"),
+      ].join("\n") + "\n",
+    );
+    const turns = [];
+    for await (const t of loadTurns(file)) turns.push(t);
+    expect(turns.map((t) => t.isForwardedEnvelope)).toEqual([
+      ...cases.map(([, flagged]) => flagged),
+      false,
+      false,
+    ]);
+  });
+});
