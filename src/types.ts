@@ -43,6 +43,8 @@ export interface Turn {
   /** Claude's `origin.kind` / `turnOrigin` (`human`, `plugin`, `scheduled`, …); either may be absent. */
   origin?: string | undefined;
   turnOrigin?: string | undefined;
+  /** Claude's `message.id`, shared by every line of one assistant reply; absent on lines without one and on Codex. */
+  messageId?: string | undefined;
   /**
    * True for a subagent (sidechain) turn. Subagent transcripts live beside the
    * session's own file and carry the *parent's* `sessionId`, so this is what

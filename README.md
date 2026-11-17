@@ -304,6 +304,25 @@ A result with an empty body is emitted too, so every recorded result can be
 joined. It is a turn with no text lines: a pattern search never matches it,
 while a `--session` dump lists it, its header followed by an empty body.
 
+## Grouping the lines of one reply
+
+Claude Code writes one assistant reply as several JSONL lines — its text in
+one, each tool call in another — and `--json` keeps them as separate hits. Every
+Claude hit whose line records a string `message.id` carries it as `messageId`,
+so the lines of one reply group in `jq` without merging them:
+
+```sh
+cg --session <id> --json | jq -s 'group_by(.messageId)'
+```
+
+Lines with no `message.id` (a `user` line has none) omit the key, and `jq`
+groups them under `null` — filter on `.messageId != null` first. A reply is
+complete only if every one of its lines reached the stream, which a pattern
+search does not guarantee; use a `--session` dump for that.
+
+Codex has no `messageId`: no reply-level id was found there, since each record
+carries an `id` of its own.
+
 ## Codex support
 
 Codex transcripts are searched alongside Claude's by default, and a Codex hit is

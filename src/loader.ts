@@ -124,9 +124,10 @@ function parseClaudeLine(
   const role = typeof obj["type"] === "string" ? obj["type"] : undefined;
   if (role !== "user" && role !== "assistant") return undefined;
 
-  const message = isRecord(obj["message"]) ? obj["message"] : undefined;
+  const message = obj["message"];
+  if (!isRecord(message)) return undefined;
   const { textLines, toolCalls, toolResults, contentKinds } = extractContent(
-    message?.["content"],
+    message["content"],
   );
   if (textLines.length === 0 && toolResults.length === 0) return undefined;
 
@@ -153,6 +154,7 @@ function parseClaudeLine(
     origin: typeof originKind === "string" ? originKind : undefined,
     turnOrigin:
       typeof obj["turnOrigin"] === "string" ? obj["turnOrigin"] : undefined,
+    messageId: typeof message["id"] === "string" ? message["id"] : undefined,
     isSidechain: obj["isSidechain"] === true,
     agentId: typeof obj["agentId"] === "string" ? obj["agentId"] : undefined,
     textLines,

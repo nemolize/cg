@@ -551,6 +551,8 @@ test("--json links a Codex call to its empty output", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].toolCalls[0].id).toBe(rows[1].toolResults[0].callId);
     expect(rows[1].toolResults[0].isError).toBeNull();
+    expect(rows[0]).not.toHaveProperty("messageId");
+    expect(rows[1]).not.toHaveProperty("messageId");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -596,6 +598,76 @@ test("--json lists contentKinds and --role human drops tool-result-only lines", 
       ["text"],
       ["tool_result", "text"],
     ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--json carries messageId so the lines of one reply group in jq", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
+  const line = (type, id, content) =>
+    JSON.stringify({
+      type,
+      sessionId: "ffffffff-1111-2222-3333-444444444444",
+      timestamp: "2026-07-13T00:00:00Z",
+      cwd: "/proj-f",
+      message: { ...(id === undefined ? {} : { id }), content },
+    });
+  writeFileSync(
+    join(dir, "f.jsonl"),
+    [
+      line("user", undefined, "marker typed by the human"),
+      line("assistant", "msg_a", [{ type: "text", text: "marker one" }]),
+      line("assistant", "msg_a", [
+        {
+          type: "tool_use",
+          id: "t1",
+          name: "Bash",
+          input: { command: "marker" },
+        },
+      ]),
+      line("assistant", "msg_a", [
+        {
+          type: "tool_use",
+          id: "t2",
+          name: "Bash",
+          input: { command: "marker" },
+        },
+      ]),
+      line("assistant", "msg_b", [{ type: "text", text: "marker two" }]),
+      line("assistant", 7, [{ type: "text", text: "marker non-string id" }]),
+    ].join("\n"),
+  );
+  try {
+    const rows = runCli(["marker", "--root", dir, "--json"])
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+
+    expect(rows.map((r) => r.messageId)).toStrictEqual([
+      undefined,
+      "msg_a",
+      "msg_a",
+      "msg_a",
+      "msg_b",
+      undefined,
+    ]);
+    expect(rows[0]).not.toHaveProperty("messageId");
+    expect(rows[5]).not.toHaveProperty("messageId");
+
+    const groups = Object.groupBy(
+      rows.filter((r) => r.messageId !== undefined),
+      (r) => r.messageId,
+    );
+    expect(Object.values(groups).map((g) => g.length)).toStrictEqual([3, 1]);
+
+    const dump = runCli(["--session", "ffffffff", "--root", dir, "--json"])
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+    expect(dump.map((r) => r.messageId)).toStrictEqual(
+      rows.map((r) => r.messageId),
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
