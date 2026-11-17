@@ -413,3 +413,58 @@ test("loadTurns flags an interrupt marker only as the single text block of a use
     ]);
   });
 });
+
+test("loadTurns flags a local-command record only when the whole string is one of its forms", async () => {
+  await withTempDir(async (dir) => {
+    const file = join(dir, "s.jsonl");
+    const command = (args, name = "/clear") =>
+      `<command-name>${name}</command-name>\n            <command-message>${name.slice(1)}</command-message>\n            <command-args>${args}</command-args>`;
+    const out = (tag, body = "done") => `<${tag}>${body}</${tag}>`;
+    const cases = [
+      [out("local-command-stdout"), true],
+      [out("local-command-stderr", "boom\nmore"), true],
+      [out("local-command-stdout", ""), true],
+      [out("bash-stdout", "ok"), true],
+      [out("bash-stdout", "ok") + out("bash-stderr", ""), true],
+      [out("bash-stdout", "ok") + out("bash-stderr", "warn"), true],
+      [command(""), true],
+      [command("", "/mcp").replaceAll("\n            ", ""), true],
+      [command("why did this fail?"), false],
+      [out("bash-input", " railway login"), false],
+      [out("bash-stderr", "alone"), false],
+      [`see ${out("local-command-stdout")}`, false],
+      [`${out("local-command-stdout")} thanks`, false],
+      [`${out("local-command-stdout")}\n`, false],
+      [out("local-command-stdout") + out("local-command-stdout"), false],
+      [out("bash-stderr", "x") + out("bash-stdout", "y"), false],
+      [out("bash-stdout", "a") + out("bash-stdout", "b"), false],
+      [`${command("")}\nextra`, false],
+      [command("").replace("<command-args></command-args>", ""), false],
+      [command("").replace("/clear", "<b>"), false],
+    ];
+    const text = (t) => ({ type: "text", text: t });
+    await writeFile(
+      file,
+      [
+        ...cases.map(([content]) =>
+          JSON.stringify({ type: "user", message: { content } }),
+        ),
+        JSON.stringify({
+          type: "user",
+          message: { content: [text(out("local-command-stdout"))] },
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { content: out("local-command-stdout") },
+        }),
+      ].join("\n") + "\n",
+    );
+    const turns = [];
+    for await (const t of loadTurns(file)) turns.push(t);
+    expect(turns.map((t) => t.isInjectedText)).toEqual([
+      ...cases.map(([, flagged]) => flagged),
+      false,
+      false,
+    ]);
+  });
+});

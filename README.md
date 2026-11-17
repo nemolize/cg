@@ -223,17 +223,23 @@ and the injected-text check below. It is still not strictly "what the human type
 
 - subagent orchestrator prompts count as `user` text — add `--subagents exclude`;
 - a Claude line with no origin field is dropped when its text is exactly one of
-  two injected forms: a string starting `Another Claude session sent a message:`
-  and a `teammate-message`, `agent-message` or `cross-session-message` tag (a
-  message forwarded from another session), or an array whose only block is the
-  text `[Request interrupted by user]` or `[Request interrupted by user for tool
-use]`. This is a text heuristic, so a human who pastes the same envelope is
-  dropped too; `--role user` shows it. A line that records `human` is kept, and
-  so is anything that only resembles these forms: another tag or wording, the
-  envelope in array content or after leading whitespace, a marker with more text
-  around it;
+  these injected forms: a string starting `Another Claude session sent a
+message:` and a `teammate-message`, `agent-message` or `cross-session-message`
+  tag (a message forwarded from another session); an array whose only block is
+  the text `[Request interrupted by user]` or `[Request interrupted by user for
+tool use]`; a string that is one `<local-command-stdout>` or
+  `<local-command-stderr>` element; one `<bash-stdout>` element, optionally
+  followed by one `<bash-stderr>` element (the output of a `!` shell command);
+  or a `<command-name>` record with an empty `<command-args>` (`/clear`). This
+  is a text heuristic, so a human who pastes the same text is dropped too;
+  `--role user` shows it. A line that records `human` is kept, and so is
+  anything that only resembles these forms: another tag or wording, a
+  `<bash-input>` line, a command record with arguments, the same text in array
+  content or with other text around it;
+- most `!` shell output is kept: Claude Code usually records it with
+  `turnOrigin: human`, and only the lines above that record no origin are dropped;
 - other Claude lines without an origin field are not detected: older
-  transcripts, the output of a `!` shell command;
+  transcripts;
 - Codex's injected context is likewise not detected.
 
 `--role human` drops `isMeta` turns even with `--include-meta`.

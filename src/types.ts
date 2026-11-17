@@ -43,7 +43,7 @@ export interface Turn {
   /** Claude's `origin.kind` / `turnOrigin` (`human`, `plugin`, `scheduled`, …); either may be absent. */
   origin?: string | undefined;
   turnOrigin?: string | undefined;
-  /** Claude `user` text that is a forwarded session message or an interrupt marker. */
+  /** Claude `user` text Claude Code injected: forwarded message, interrupt marker, local-command record. */
   isInjectedText?: boolean | undefined;
   /** Claude's `message.id`, shared by every line of one assistant reply; absent on lines without one and on Codex. */
   messageId?: string | undefined;

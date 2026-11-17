@@ -113,8 +113,29 @@ const INTERRUPT_MARKERS: ReadonlySet<string> = new Set([
   "[Request interrupted by user for tool use]",
 ]);
 
+const element = (tag: string): string =>
+  `<${tag}>(?:(?!</${tag}>)[\\s\\S])*</${tag}>`;
+
+const LOCAL_COMMAND_OUTPUT = new RegExp(
+  `^(?:${element("local-command-stdout")}|${element("local-command-stderr")})$`,
+);
+const BASH_OUTPUT = new RegExp(
+  `^${element("bash-stdout")}(?:${element("bash-stderr")})?$`,
+);
+const ARGLESS_COMMAND_RECORD =
+  /^<command-name>[^<]*<\/command-name>\s*<command-message>[^<]*<\/command-message>\s*<command-args><\/command-args>$/;
+
+const INJECTED_STRING_FORMS: readonly RegExp[] = [
+  FORWARDED_ENVELOPE,
+  LOCAL_COMMAND_OUTPUT,
+  BASH_OUTPUT,
+  ARGLESS_COMMAND_RECORD,
+];
+
 function isInjectedClaudeText(content: unknown): boolean {
-  if (typeof content === "string") return FORWARDED_ENVELOPE.test(content);
+  if (typeof content === "string") {
+    return INJECTED_STRING_FORMS.some((form) => form.test(content));
+  }
   if (!Array.isArray(content) || content.length !== 1) return false;
   const block: unknown = content[0];
   return (
