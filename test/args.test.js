@@ -21,6 +21,29 @@ test("missing pattern errors", () => {
   expect(r.kind).toBe("error");
 });
 
+test("--json stands in for the pattern, alone or with a summary flag", () => {
+  for (const argv of [["--json"], ["--json", "-c"], ["--json", "-l"]]) {
+    const r = parse(argv);
+    expect(r.kind).toBe("options");
+    if (r.kind === "options") expect(r.options.pattern).toBe(undefined);
+  }
+});
+
+test("a missing pattern still errors without --json, summary flags included", () => {
+  for (const argv of [["-c"], ["-l"], ["--since", "7d"], ["--role", "human"]]) {
+    expect(parse(argv)).toStrictEqual({
+      kind: "error",
+      message: "missing search pattern",
+    });
+  }
+});
+
+test("--json keeps a pattern that is given", () => {
+  const r = parse(["needle", "--json"]);
+  expect(r.kind).toBe("options");
+  if (r.kind === "options") expect(r.options.pattern).toBe("needle");
+});
+
 test("help and version", () => {
   expect(parse(["-h"]).kind).toBe("help");
   expect(parse(["--help"]).kind).toBe("help");

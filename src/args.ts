@@ -17,6 +17,7 @@ Usage:
   cg <pattern> [options]
   cg --session <id> [pattern] [options]
   cg --tool <name[,name...]> [--file <substring>] [pattern] [options]
+  cg --json [pattern] [options]
 
 Pattern:
   Substring match by default.
@@ -64,7 +65,9 @@ Context & output:
   -c, --count          Print the number of hits instead of the hits
   -l, --list-sessions  Print one line per matching session, most hits first
   --json               Emit one JSON object per hit — or per session with -l,
-                       or a single {"hits":N} with -c (pipeline-friendly)
+                       or a single {"hits":N} with -c (pipeline-friendly);
+                       the pattern is optional, and without one every turn
+                       that passes the filters is emitted
   --color <always|never|auto>   Colorize output (default: auto)
   --resume             Print the resume command for the top hit
                        (\`claude --resume <id>\` / \`codex resume <id>\`)
@@ -162,8 +165,8 @@ const findControlOption = (args: string[]): "help" | "version" | undefined => {
  * Parse argv (excluding node + script) into structured options. Unknown flags
  * and missing values produce an `error` result rather than throwing, so the CLI
  * can print a message + usage and exit non-zero. The first non-flag argument is
- * the pattern — required unless `--session` is given; a leading `--` stops
- * option parsing.
+ * the pattern — required unless a flag stands in for it (see the guard below);
+ * a leading `--` stops option parsing.
  */
 export function parseArgs(
   argv: string[],
@@ -276,12 +279,13 @@ export function parseArgs(
   }
 
   // `--tool` / `--file` select turns on their own, so they stand in for the
-  // pattern the same way `--session` does.
+  // pattern the same way `--session` does; `--json` feeds a pipe, not a terminal.
   if (
     pattern === undefined &&
     session === undefined &&
     tools === undefined &&
-    values.file === undefined
+    values.file === undefined &&
+    values.json !== true
   ) {
     return err("missing search pattern");
   }

@@ -128,6 +128,66 @@ test("--json pairs with the summary flags", () => {
   });
 });
 
+test("--json without a pattern emits every turn that passes the filters, text-less ones included", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
+  const line = (type, timestamp, content) =>
+    JSON.stringify({
+      type,
+      sessionId: "eeeeeeee-1111-2222-3333-444444444444",
+      timestamp,
+      cwd: "/proj-e",
+      message: { content },
+    });
+  writeFileSync(
+    join(dir, "e.jsonl"),
+    [
+      line("user", "2026-07-13T00:00:00Z", "hello"),
+      line("assistant", "2026-07-13T00:00:01Z", [
+        { type: "tool_use", id: "t1", name: "Bash", input: { command: "x" } },
+      ]),
+      line("user", "2026-07-13T00:00:02Z", [
+        { type: "tool_result", tool_use_id: "t1", content: "" },
+      ]),
+      line("user", "2026-01-01T00:00:00Z", "old"),
+    ].join("\n"),
+  );
+  try {
+    const rows = (args) =>
+      runCli([...args, "--root", dir, "--json"])
+        .trim()
+        .split("\n")
+        .map((l) => JSON.parse(l));
+
+    expect(rows(["--since", "2026-07-01"])).toHaveLength(3);
+    expect(rows([])).toHaveLength(4);
+    expect(rows(["--role", "assistant"])).toHaveLength(1);
+    expect(JSON.parse(runCli(["--root", dir, "--json", "-c"]))).toEqual({
+      hits: 4,
+    });
+    expect(runCli(["--root", dir, "--json", "-l"]).trim().split("\n")).toEqual([
+      JSON.stringify({
+        source: "claude",
+        sessionId: "eeeeeeee-1111-2222-3333-444444444444",
+        hits: 4,
+        cwd: "/proj-e",
+      }),
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("without --json a missing pattern exits 2", () => {
+  withCorpus((root) => {
+    for (const args of [[], ["-c"], ["-l"], ["--since", "7d"]]) {
+      const r = spawnCli([...args, "--root", root]);
+      expect(r.status).toBe(2);
+      expect(r.stderr).toContain("missing search pattern");
+      expect(r.stdout).toBe("");
+    }
+  });
+});
+
 test("summary --json omits absent keys, matching the per-hit shape", () => {
   const dir = mkdtempSync(join(tmpdir(), "cg-cli-noid-"));
   try {
@@ -702,14 +762,15 @@ const daysAgo = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
 
 test("the sessions-active recipe counts sessions, not turns, per project", () => {
   const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
-  const turn = (sessionId, cwd, timestamp) =>
+  const turn = (sessionId, cwd, timestamp, content = "hello") =>
     JSON.stringify({
       type: "user",
       sessionId,
       timestamp,
       cwd,
-      message: { content: "hello" },
+      message: { content },
     });
+  const emptyResult = [{ type: "tool_result", tool_use_id: "t1", content: "" }];
   writeFileSync(
     join(dir, "a.jsonl"),
     [
@@ -718,12 +779,14 @@ test("the sessions-active recipe counts sessions, not turns, per project", () =>
       turn("s2", "/proj-a", daysAgo(5)),
       turn("s3", "/proj-b", daysAgo(8)),
       turn("s4", "/proj-b", daysAgo(90)),
+      turn("s5", "/proj-c", daysAgo(4), emptyResult),
     ].join("\n"),
   );
   try {
     expect(runRecipe("Sessions active per project", dir)).toStrictEqual([
       { cwd: "/proj-a", sessionsActive: 2 },
       { cwd: "/proj-b", sessionsActive: 1 },
+      { cwd: "/proj-c", sessionsActive: 1 },
     ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
