@@ -81,6 +81,9 @@ jobs:
     needs: pack
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@nemolize/cg
     permissions:
       contents: write
       id-token: write
