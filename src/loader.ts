@@ -133,6 +133,9 @@ function parseClaudeLine(
   const timestamp =
     typeof obj["timestamp"] === "string" ? obj["timestamp"] : undefined;
   const parsedTs = timestamp === undefined ? NaN : Date.parse(timestamp);
+  const originKind = isRecord(obj["origin"])
+    ? obj["origin"]["kind"]
+    : undefined;
 
   return {
     file,
@@ -147,6 +150,9 @@ function parseClaudeLine(
     gitBranch:
       typeof obj["gitBranch"] === "string" ? obj["gitBranch"] : undefined,
     isMeta: obj["isMeta"] === true,
+    origin: typeof originKind === "string" ? originKind : undefined,
+    turnOrigin:
+      typeof obj["turnOrigin"] === "string" ? obj["turnOrigin"] : undefined,
     isSidechain: obj["isSidechain"] === true,
     agentId: typeof obj["agentId"] === "string" ? obj["agentId"] : undefined,
     textLines,

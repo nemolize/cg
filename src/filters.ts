@@ -78,14 +78,19 @@ function passesSubagentScope(turn: Turn, opts: Options): boolean {
 }
 
 /**
- * Claude records tool results as `user` lines, so `user` alone mixes in tool
- * output; `human` keeps only the lines that carry typed text.
+ * `human` keeps typed text only: tool results and Claude-injected text are also
+ * `user` lines. No origin field on a line → the text rule alone decides.
  */
 function passesRole(turn: Turn, opts: Options): boolean {
   if (opts.role === "any") return true;
   if (opts.role === "human") {
     return (
-      turn.role === "user" && !turn.isMeta && turn.contentKinds.includes("text")
+      turn.role === "user" &&
+      !turn.isMeta &&
+      turn.contentKinds.includes("text") &&
+      [turn.origin, turn.turnOrigin].every(
+        (origin) => origin === undefined || origin === "human",
+      )
     );
   }
   return turn.role === opts.role;
