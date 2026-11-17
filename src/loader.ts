@@ -128,7 +128,6 @@ const ARGLESS_COMMAND_RECORD =
 const INJECTED_STRING_FORMS: readonly RegExp[] = [
   FORWARDED_ENVELOPE,
   LOCAL_COMMAND_OUTPUT,
-  BASH_OUTPUT,
   ARGLESS_COMMAND_RECORD,
 ];
 
@@ -196,6 +195,10 @@ function parseClaudeLine(
     turnOrigin:
       typeof obj["turnOrigin"] === "string" ? obj["turnOrigin"] : undefined,
     isInjectedText: role === "user" && isInjectedClaudeText(message["content"]),
+    isBashOutput:
+      role === "user" &&
+      typeof message["content"] === "string" &&
+      BASH_OUTPUT.test(message["content"]),
     messageId: typeof message["id"] === "string" ? message["id"] : undefined,
     isSidechain: obj["isSidechain"] === true,
     agentId: typeof obj["agentId"] === "string" ? obj["agentId"] : undefined,

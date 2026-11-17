@@ -45,9 +45,10 @@ Filters:
   --include-subagents           Deprecated alias for --subagents=include
   --role <user|assistant|human|any>
                                 Restrict by turn role (default: any); human =
-                                user turns carrying text, not tool output or
-                                text Claude Code marks as injected (unmarked
-                                and Codex-injected text still counts)
+                                user turns carrying text, not tool output,
+                                !-command output or text Claude Code marks as
+                                injected (unmarked and Codex-injected text
+                                still counts)
   --since <dur|date>            Only turns at/after (e.g. 7d, 2h, 2026-06-01)
   --until <dur|date>            Only turns at/before
   --cwd <substring>             Restrict to sessions whose cwd matches
