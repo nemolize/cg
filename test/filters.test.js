@@ -255,12 +255,12 @@ test("--tool and --file must hold on the same call", () => {
   ).toBe(true);
 });
 
-test("--role human drops a forwarded envelope that records no origin, unless origin says human", () => {
+test("--role human drops injected text that records no origin, unless origin says human", () => {
   const human = opts({ role: "human" });
-  const fwd = turn({ isForwardedEnvelope: true });
-  expect(passesFilters(fwd, human)).toBe(false);
-  expect(passesFilters({ ...fwd, origin: "human" }, human)).toBe(true);
-  expect(passesFilters({ ...fwd, turnOrigin: "human" }, human)).toBe(true);
-  expect(passesFilters(turn({ isForwardedEnvelope: false }), human)).toBe(true);
-  expect(passesFilters(fwd, opts({ role: "user" }))).toBe(true);
+  const injected = turn({ isInjectedText: true });
+  expect(passesFilters(injected, human)).toBe(false);
+  expect(passesFilters({ ...injected, origin: "human" }, human)).toBe(true);
+  expect(passesFilters({ ...injected, turnOrigin: "human" }, human)).toBe(true);
+  expect(passesFilters(turn({ isInjectedText: false }), human)).toBe(true);
+  expect(passesFilters(injected, opts({ role: "user" }))).toBe(true);
 });

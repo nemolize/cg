@@ -219,17 +219,21 @@ and `contentKinds` includes `text`; `--role user` is unchanged. A Claude line
 that records `origin.kind` or `turnOrigin` is also dropped unless that value is
 `human`, which leaves out background-task notices, scheduled and plugin
 prompts, and SDK prompts. A line with neither field is judged by the text rule
-and the forwarded-message check below. It is still not strictly "what the human typed":
+and the injected-text check below. It is still not strictly "what the human typed":
 
 - subagent orchestrator prompts count as `user` text — add `--subagents exclude`;
-- a Claude line with no origin field whose text starts `Another Claude session
-sent a message:` and a `teammate-message`, `agent-message` or
-  `cross-session-message` tag is dropped as a forwarded message. This is a text
-  heuristic, so a human who pastes the same envelope is dropped too; `--role
-user` shows it. A line that records `human` is kept, and so are the same
-  text in array content or after leading whitespace, and any other tag;
+- a Claude line with no origin field is dropped when its text is exactly one of
+  two injected forms: a string starting `Another Claude session sent a message:`
+  and a `teammate-message`, `agent-message` or `cross-session-message` tag (a
+  message forwarded from another session), or an array whose only block is the
+  text `[Request interrupted by user]` or `[Request interrupted by user for tool
+use]`. This is a text heuristic, so a human who pastes the same envelope is
+  dropped too; `--role user` shows it. A line that records `human` is kept, and
+  so is anything that only resembles these forms: another tag or wording, the
+  envelope in array content or after leading whitespace, a marker with more text
+  around it;
 - other Claude lines without an origin field are not detected: older
-  transcripts, the output of a `!` shell command, interrupt markers;
+  transcripts, the output of a `!` shell command;
 - Codex's injected context is likewise not detected.
 
 `--role human` drops `isMeta` turns even with `--include-meta`.

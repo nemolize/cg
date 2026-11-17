@@ -108,6 +108,23 @@ function carriesCodexFileState(line: string): boolean {
 const FORWARDED_ENVELOPE =
   /^Another Claude session sent a message:\r?\n<(?:teammate-message|agent-message|cross-session-message)(?=[ \t>])/;
 
+const INTERRUPT_MARKERS: ReadonlySet<string> = new Set([
+  "[Request interrupted by user]",
+  "[Request interrupted by user for tool use]",
+]);
+
+function isInjectedClaudeText(content: unknown): boolean {
+  if (typeof content === "string") return FORWARDED_ENVELOPE.test(content);
+  if (!Array.isArray(content) || content.length !== 1) return false;
+  const block: unknown = content[0];
+  return (
+    isRecord(block) &&
+    block["type"] === "text" &&
+    typeof block["text"] === "string" &&
+    INTERRUPT_MARKERS.has(block["text"])
+  );
+}
+
 function parseClaudeLine(
   file: string,
   lineIndex: number,
@@ -157,10 +174,7 @@ function parseClaudeLine(
     origin: typeof originKind === "string" ? originKind : undefined,
     turnOrigin:
       typeof obj["turnOrigin"] === "string" ? obj["turnOrigin"] : undefined,
-    isForwardedEnvelope:
-      role === "user" &&
-      typeof message["content"] === "string" &&
-      FORWARDED_ENVELOPE.test(message["content"]),
+    isInjectedText: role === "user" && isInjectedClaudeText(message["content"]),
     messageId: typeof message["id"] === "string" ? message["id"] : undefined,
     isSidechain: obj["isSidechain"] === true,
     agentId: typeof obj["agentId"] === "string" ? obj["agentId"] : undefined,

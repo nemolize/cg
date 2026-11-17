@@ -370,9 +370,49 @@ test("loadTurns flags only a plain-string forwarded envelope at the very start o
     );
     const turns = [];
     for await (const t of loadTurns(file)) turns.push(t);
-    expect(turns.map((t) => t.isForwardedEnvelope)).toEqual([
+    expect(turns.map((t) => t.isInjectedText)).toEqual([
       ...cases.map(([, flagged]) => flagged),
       false,
+      false,
+    ]);
+  });
+});
+
+test("loadTurns flags an interrupt marker only as the single text block of a user line, matched exactly", async () => {
+  await withTempDir(async (dir) => {
+    const file = join(dir, "s.jsonl");
+    const user = "[Request interrupted by user]";
+    const tool = "[Request interrupted by user for tool use]";
+    const text = (t) => ({ type: "text", text: t });
+    const line = (content, type = "user") =>
+      JSON.stringify({ type, message: { content } });
+    const cases = [
+      [[text(user)], true],
+      [[text(tool)], true],
+      [[text(`${user} please continue`)], false],
+      [[text(` ${user}`)], false],
+      [[text(`${user}\n`)], false],
+      [[text(user.toLowerCase())], false],
+      [[text(user), text("more")], false],
+      [[{ type: "tool_result", content: user }], false],
+      [[{ type: "tool_result", text: user }], false],
+      [user, false],
+    ];
+    await writeFile(
+      file,
+      [
+        ...cases.map(([content]) => line(content)),
+        line([text(user)], "assistant"),
+      ].join("\n") + "\n",
+    );
+    const turns = [];
+    for await (const t of loadTurns(file)) turns.push(t);
+    expect(turns.map((t) => t.isInjectedText)).toEqual([
+      ...cases
+        .filter(
+          ([content]) => content.length !== 0 || typeof content === "string",
+        )
+        .map(([, flagged]) => flagged),
       false,
     ]);
   });
