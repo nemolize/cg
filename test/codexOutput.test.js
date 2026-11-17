@@ -44,8 +44,8 @@ const cases = [
   ["number", "1e2", ["100"]],
   ["null", "null", ["null"]],
   ["boolean", "true", ["true"]],
-  ["empty text", "", undefined],
-  ["empty JSON string", '""', undefined],
+  ["empty text", "", []],
+  ["empty JSON string", '""', []],
   [
     "content blocks",
     [{ type: "input_text", text: "needle\nnext" }],
@@ -62,10 +62,9 @@ for (const type of ["custom_tool_call_output", "function_call_output"]) {
       newCodexFileState(),
     );
     expect(turn?.textLines).toEqual(expected);
-    if (turn) {
-      expect(turn.role).toBe("user");
-      expect(turn.toolCalls).toEqual([]);
-    }
+    expect(turn?.role).toBe("user");
+    expect(turn?.toolCalls).toEqual([]);
+    expect(turn?.toolResults).toEqual([{ isError: null }]);
   });
 }
 

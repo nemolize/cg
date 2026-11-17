@@ -220,3 +220,71 @@ test("isReadableDir true for dir, false for missing", async () => {
     expect(await isReadableDir(join(dir, "nope"))).toBe(false);
   });
 });
+
+test("a Claude call and its result on separate lines join on id", async () => {
+  await withTempDir(async (dir) => {
+    const file = join(dir, "s.jsonl");
+    await writeFile(
+      file,
+      [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", id: "toolu_9", name: "Bash", input: {} },
+            ],
+          },
+        }),
+        JSON.stringify({
+          type: "user",
+          message: {
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: "toolu_9",
+                is_error: true,
+                content: "denied",
+              },
+            ],
+          },
+        }),
+      ].join("\n"),
+    );
+    const turns = [];
+    for await (const t of loadTurns(file)) turns.push(t);
+    expect(turns[0].toolCalls[0].id).toBe("toolu_9");
+    expect(turns[1].toolResults).toStrictEqual([
+      { callId: "toolu_9", isError: true },
+    ]);
+  });
+});
+
+test("a Claude line whose only block is an empty tool_result is kept; one with neither text nor result is dropped", async () => {
+  await withTempDir(async (dir) => {
+    const file = join(dir, "s.jsonl");
+    await writeFile(
+      file,
+      [
+        JSON.stringify({
+          type: "user",
+          message: {
+            content: [{ type: "tool_result", tool_use_id: "t", content: "" }],
+          },
+        }),
+        JSON.stringify({ type: "user", message: { content: [] } }),
+        JSON.stringify({
+          type: "user",
+          message: { content: [{ type: "image" }] },
+        }),
+      ].join("\n"),
+    );
+    const turns = [];
+    for await (const t of loadTurns(file)) turns.push(t);
+    expect(turns).toHaveLength(1);
+    expect(turns[0].lineIndex).toBe(0);
+    expect(turns[0].textLines).toEqual([]);
+    expect(turns[0].toolResults).toStrictEqual([
+      { callId: "t", isError: null },
+    ]);
+  });
+});

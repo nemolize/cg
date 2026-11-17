@@ -742,3 +742,109 @@ test("resume wording follows the source, so a copied command reopens the right a
   expect(resumeCommandFor("claude", "abc")).toBe("claude --resume abc");
   expect(resumeCommandFor("codex", "abc")).toBe("codex resume abc");
 });
+
+function item(payload) {
+  return JSON.stringify({
+    timestamp: "2026-09-14T04:20:00.000Z",
+    type: "response_item",
+    payload,
+  });
+}
+
+test("function_call, custom_tool_call and tool_search_call carry id = call_id; web_search_call has none", async () => {
+  await withCodexFile(
+    [
+      meta(),
+      item({
+        type: "function_call",
+        name: "send_message",
+        call_id: "call_f",
+        arguments: '{"to":"x"}',
+      }),
+      item({
+        type: "custom_tool_call",
+        name: "exec",
+        call_id: "call_c",
+        status: "completed",
+        input: "run()",
+      }),
+      item({
+        type: "tool_search_call",
+        call_id: "call_s",
+        arguments: { query: "needle" },
+      }),
+      item({ type: "web_search_call", action: { type: "search", query: "q" } }),
+    ],
+    (turns) => {
+      expect(turns.map((t) => t.toolCalls[0]?.id)).toEqual([
+        "call_f",
+        "call_c",
+        "call_s",
+        undefined,
+      ]);
+      expect(turns[3].toolCalls[0]).not.toHaveProperty("id");
+    },
+  );
+});
+
+test("Codex outputs yield callId and isError null, even when the paired call says completed", async () => {
+  await withCodexFile(
+    [
+      meta(),
+      item({
+        type: "custom_tool_call",
+        name: "exec",
+        call_id: "call_c",
+        status: "completed",
+        input: "run()",
+      }),
+      item({
+        type: "custom_tool_call_output",
+        call_id: "call_c",
+        output: "boom",
+      }),
+      item({
+        type: "function_call_output",
+        call_id: "call_f",
+        output: "fine",
+      }),
+    ],
+    (turns) => {
+      expect(turns[0].toolCalls[0].id).toBe("call_c");
+      expect(turns[1].toolResults).toStrictEqual([
+        { callId: "call_c", isError: null },
+      ]);
+      expect(turns[1].toolResults[0].isError).not.toBe(false);
+      expect(turns[2].toolResults).toStrictEqual([
+        { callId: "call_f", isError: null },
+      ]);
+    },
+  );
+});
+
+test('an output with output: "" is emitted as a turn with no text and one result', async () => {
+  await withCodexFile(
+    [
+      meta(),
+      item({ type: "function_call_output", call_id: "call_e", output: "" }),
+      item({ type: "function_call_output", output: "" }),
+    ],
+    (turns) => {
+      expect(turns).toHaveLength(2);
+      expect(turns[0].textLines).toEqual([]);
+      expect(turns[0].toolResults).toStrictEqual([
+        { callId: "call_e", isError: null },
+      ]);
+      expect(turns[1].toolResults).toStrictEqual([{ isError: null }]);
+    },
+  );
+});
+
+test("a record with neither text nor result is still dropped", async () => {
+  await withCodexFile(
+    [meta(), item({ type: "message", role: "user", content: [] })],
+    (turns) => {
+      expect(turns).toEqual([]);
+    },
+  );
+});

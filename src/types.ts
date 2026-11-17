@@ -1,11 +1,18 @@
 /** One tool call: what `--tool` and `--file` filter on, plus its input for `--json`. */
 export interface ToolCall {
+  id?: string;
   /** Empty when the block carried no `name`. */
   name: string;
   /** Values of the call's path-shaped input fields, in input order. */
   paths: string[];
   /** Per-source shape (see README); absent when the call carried none. */
   input?: unknown;
+}
+
+export interface ToolResult {
+  callId?: string;
+  /** Claude's `is_error`; `null` wherever the source records no boolean. */
+  isError: boolean | null;
 }
 
 /**
@@ -45,6 +52,7 @@ export interface Turn {
   textLines: string[];
   /** Structural view of the turn's `tool_use` blocks. */
   toolCalls: ToolCall[];
+  toolResults: ToolResult[];
 }
 
 /** Agent whose transcripts are being read; each has its own root and schema. */

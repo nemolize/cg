@@ -51,6 +51,7 @@ function hit(over) {
       isSidechain: false,
       textLines: ["line0", "match here", "line2"],
       toolCalls: [],
+      toolResults: [],
       ...over,
     },
     matchedLineIndices: [1],
