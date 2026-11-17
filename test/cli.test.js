@@ -440,3 +440,117 @@ test("--json carries a tool call's input in full, on a hit and in a --session du
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("--json links results to calls, and an empty result is searchable only without a pattern", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
+  const sessionId = "dddddddd-1111-2222-3333-444444444444";
+  const line = (type, content) =>
+    JSON.stringify({
+      type,
+      sessionId,
+      timestamp: "2026-07-13T00:00:00Z",
+      cwd: "/proj-d",
+      message: { content },
+    });
+  writeFileSync(
+    join(dir, "d.jsonl"),
+    [
+      line("assistant", [
+        {
+          type: "tool_use",
+          id: "toolu_1",
+          name: "Bash",
+          input: { command: "x" },
+        },
+      ]),
+      line("user", [
+        {
+          type: "tool_result",
+          tool_use_id: "toolu_1",
+          is_error: true,
+          content: "",
+        },
+      ]),
+    ].join("\n"),
+  );
+  try {
+    const parse = (args) =>
+      runCli(args)
+        .trim()
+        .split("\n")
+        .filter((l) => l !== "")
+        .map((l) => JSON.parse(l));
+
+    const dump = parse(["--session", sessionId, "--root", dir, "--json"]);
+    expect(dump).toHaveLength(2);
+    expect(dump[0].toolCalls[0].id).toBe("toolu_1");
+    expect(dump[1].toolResults).toStrictEqual([
+      { callId: "toolu_1", isError: true },
+    ]);
+    expect(dump[1].toolCalls).toBeUndefined();
+    expect(dump[0].toolResults).toBeUndefined();
+
+    expect(parse(["--tool", "Bash", "--root", dir, "--json"])).toHaveLength(1);
+    expect(parse(["command", "--root", dir, "--json"])).toHaveLength(1);
+    expect(runCli(["--session", sessionId, "--root", dir, "-c"]).trim()).toBe(
+      "2",
+    );
+
+    const text = runCli([
+      "--session",
+      sessionId,
+      "--root",
+      dir,
+      "--color",
+      "never",
+    ]);
+    expect(text).toContain("dddddddd");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--json links a Codex call to its empty output", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
+  const rec = (payload) =>
+    JSON.stringify({
+      timestamp: "2026-07-13T00:00:00Z",
+      type: "response_item",
+      payload,
+    });
+  writeFileSync(
+    join(dir, "rollout-2026-07-13T00-00-00-thread-1.jsonl"),
+    [
+      JSON.stringify({
+        type: "session_meta",
+        payload: { id: "thread-1", cwd: "/proj-e", thread_source: "user" },
+      }),
+      rec({
+        type: "function_call",
+        name: "send_message",
+        call_id: "call_1",
+        arguments: "{}",
+      }),
+      rec({ type: "function_call_output", call_id: "call_1", output: "" }),
+    ].join("\n"),
+  );
+  try {
+    const rows = runCli([
+      "--session",
+      "thread-1",
+      "--source",
+      "codex",
+      "--codex-root",
+      dir,
+      "--json",
+    ])
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+    expect(rows).toHaveLength(2);
+    expect(rows[0].toolCalls[0].id).toBe(rows[1].toolResults[0].callId);
+    expect(rows[1].toolResults[0].isError).toBeNull();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

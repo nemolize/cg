@@ -326,6 +326,7 @@ export function formatHitJson(hit: Hit, opts: Options, home: string): string {
         }
       : {}),
     ...(turn.toolCalls.length > 0 ? { toolCalls: turn.toolCalls } : {}),
+    ...(turn.toolResults.length > 0 ? { toolResults: turn.toolResults } : {}),
     matchedLines: everyLineMatched
       ? []
       : hit.matchedLineIndices.map((i) => turn.textLines[i]),

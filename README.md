@@ -230,7 +230,7 @@ since the attempt is itself evidence that session was working on the file.
 records no path field, so `--file` never selects one and `--tool` takes Codex's
 own tool names — see [Codex support](#codex-support).
 
-`--json` carries a `toolCalls` array (`{name, paths, input}`) on any hit that
+`--json` carries a `toolCalls` array (`{id, name, paths, input}`) on any hit that
 made one, so the attribution is machine-readable without re-parsing the rendered
 lines. On a patternless search `matchedLines` comes back empty for the same
 reason the header stands alone — every line "matched", so listing them says
@@ -250,6 +250,31 @@ each agent's own, not a shared vocabulary:
 A call that carries no input omits the key. `input` is always emitted in full —
 no truncation, since a cut value would silently miscount in `jq`; drop it with
 `jq 'del(.toolCalls[]?.input)'` when you do not want it.
+
+A call's `id` is the identifier its result answers, and a turn carrying results
+has a turn-level `toolResults` array (`{callId, isError}`), one entry per result
+in source order — an array because one Claude line can hold several. The two
+join in `jq` on `toolCalls[].id == toolResults[].callId`, even across separate
+lines. A turn with no calls or results omits the key, as `toolCalls` does; `id`
+and `callId` are omitted when the source records none, while `isError` is always
+present.
+
+| Source | Call (`id`)                                                          | Result (`callId`)                                              | `isError`                              |
+| ------ | -------------------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------- |
+| Claude | `tool_use` block's `id`                                              | `tool_result`'s `tool_use_id`                                  | `is_error` when a boolean, else `null` |
+| Codex  | `call_id` of `function_call`, `custom_tool_call`, `tool_search_call` | `call_id` of `function_call_output`, `custom_tool_call_output` | always `null`                          |
+
+`isError` is copied only from Claude's `is_error`. `null` means the source
+recorded no outcome — never "succeeded": about a quarter of Claude's results
+omit the field, and Codex records none (a `custom_tool_call`'s `status` reads
+`completed` whatever happened). Codex's `tool_search_output` is not read and a
+`web_search_call` records no `call_id` and has no output record, so neither is
+linked yet; a `tool_search_call`'s `id` therefore matches no emitted result. A
+`tool_result` nested inside another result's content is data, not a result.
+
+A result with an empty body is emitted too, so every recorded result can be
+joined. It is a turn with no text lines: a pattern search never matches it,
+while a `--session` dump lists it, its header followed by an empty body.
 
 ## Codex support
 

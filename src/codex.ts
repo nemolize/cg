@@ -1,6 +1,6 @@
 import { isRecord } from "./guards.js";
 import { renderToolInput, renderValue, TOOL_MARK } from "./textExtract.js";
-import type { ToolCall, Turn } from "./types.js";
+import type { ToolCall, ToolResult, Turn } from "./types.js";
 
 /**
  * Codex records `cwd` only on `session_meta` / `turn_context`, so a parser
@@ -72,8 +72,18 @@ function parseArguments(raw: string): unknown {
   }
 }
 
-function withInput(name: string, input: unknown): ToolCall {
-  return { name, paths: [], ...(input != null ? { input } : {}) };
+function withInput(
+  payload: Record<string, unknown>,
+  name: string,
+  input: unknown,
+): ToolCall {
+  const id = str(payload["call_id"]);
+  return {
+    ...(id !== undefined ? { id } : {}),
+    name,
+    paths: [],
+    ...(input != null ? { input } : {}),
+  };
 }
 
 /**
@@ -104,7 +114,7 @@ function readToolCall(
 
   const textLines = [...header, ...body];
   if (textLines.length === 0) return undefined;
-  return { toolCall: withInput(name, input), textLines };
+  return { toolCall: withInput(payload, name, input), textLines };
 }
 
 function readSearchCall(
@@ -116,7 +126,7 @@ function readSearchCall(
   if (!isRecord(input) || Object.keys(input).length === 0) return undefined;
 
   return {
-    toolCall: withInput(name, input),
+    toolCall: withInput(payload, name, input),
     textLines: [`${TOOL_MARK} ${name}`, ...renderToolInput(input)],
   };
 }
@@ -135,6 +145,11 @@ function readReasoning(payload: Record<string, unknown>): string[] {
     if (typeof text === "string" && text !== "") out.push(...text.split("\n"));
   }
   return out;
+}
+
+function readToolResult(payload: Record<string, unknown>): ToolResult {
+  const callId = str(payload["call_id"]);
+  return { ...(callId !== undefined ? { callId } : {}), isError: null };
 }
 
 function readToolOutput(payload: Record<string, unknown>): string[] {
@@ -189,6 +204,7 @@ export function parseCodexLine(
   let isMeta: boolean;
   let textLines: string[];
   let toolCalls: ToolCall[] = [];
+  let toolResults: ToolResult[] = [];
 
   switch (payload["type"]) {
     case "message": {
@@ -236,13 +252,16 @@ export function parseCodexLine(
       role = "user";
       isMeta = false;
       textLines = readToolOutput(payload);
+      // Codex records no outcome, so `isError` stays `null` rather than guessing
+      // from the paired call's `status`, which is `completed` even for failures.
+      toolResults = [readToolResult(payload)];
       break;
     }
     default:
       return undefined;
   }
 
-  if (textLines.length === 0) return undefined;
+  if (textLines.length === 0 && toolResults.length === 0) return undefined;
 
   const timestamp = str(parsed["timestamp"]);
   const parsedTs = timestamp === undefined ? NaN : Date.parse(timestamp);
@@ -262,5 +281,6 @@ export function parseCodexLine(
     agentId: state.isSubagent ? state.threadId : undefined,
     textLines,
     toolCalls,
+    toolResults,
   };
 }

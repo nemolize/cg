@@ -1,10 +1,11 @@
 import { isRecord } from "./guards.js";
-import type { ToolCall } from "./types.js";
+import type { ToolCall, ToolResult } from "./types.js";
 
 /** Text lines plus the tool calls `--tool` / `--file` filter on. */
 export interface ExtractedContent {
   textLines: string[];
   toolCalls: ToolCall[];
+  toolResults: ToolResult[];
 }
 
 /**
@@ -22,9 +23,13 @@ export interface ExtractedContent {
  */
 export function extractContent(content: unknown): ExtractedContent {
   const out: string[] = [];
-  const toolCalls: ToolCall[] = [];
-  collect(content, out, 0, toolCalls);
-  return { textLines: out.flatMap((s) => s.split("\n")), toolCalls };
+  const found: Structural = { toolCalls: [], toolResults: [] };
+  collect(content, out, 0, found);
+  return {
+    textLines: out.flatMap((s) => s.split("\n")),
+    toolCalls: found.toolCalls,
+    toolResults: found.toolResults,
+  };
 }
 
 /** Text-only view of {@link extractContent}. */
@@ -34,11 +39,16 @@ export function extractTextLines(content: unknown): string[] {
 
 const MAX_DEPTH = 8;
 
+interface Structural {
+  toolCalls: ToolCall[];
+  toolResults: ToolResult[];
+}
+
 function collect(
   node: unknown,
   out: string[],
   depth: number,
-  toolCalls: ToolCall[] | null,
+  found: Structural | null,
 ): void {
   if (node == null || depth > MAX_DEPTH) return;
 
@@ -48,7 +58,7 @@ function collect(
   }
 
   if (Array.isArray(node)) {
-    for (const item of node) collect(item, out, depth + 1, toolCalls);
+    for (const item of node) collect(item, out, depth + 1, found);
     return;
   }
 
@@ -57,18 +67,19 @@ function collect(
 
   switch (block["type"]) {
     case "text":
-      collect(block["text"], out, depth + 1, toolCalls);
+      collect(block["text"], out, depth + 1, found);
       return;
     case "thinking":
-      collect(block["thinking"], out, depth + 1, toolCalls);
+      collect(block["thinking"], out, depth + 1, found);
       return;
     case "tool_result":
-      // A tool's output is data: a `tool_use` echoed back inside it is not a
-      // call the session made, so collection stops here (text still extracts).
+      // A `tool_use` or `tool_result` echoed back inside a result is data, not
+      // one the session made, so collection stops here (text still extracts).
+      found?.toolResults.push(readToolResult(block));
       collect(block["content"], out, depth + 1, null);
       return;
     case "tool_use":
-      collectToolUse(block, out, toolCalls);
+      collectToolUse(block, out, found?.toolCalls ?? null);
       return;
     case "image":
       return; // no text to search
@@ -76,6 +87,15 @@ function collect(
       if (typeof block["text"] === "string") out.push(block["text"]);
       return;
   }
+}
+
+function readToolResult(block: Record<string, unknown>): ToolResult {
+  const callId = block["tool_use_id"];
+  const isError = block["is_error"];
+  return {
+    ...(typeof callId === "string" && callId !== "" ? { callId } : {}),
+    isError: typeof isError === "boolean" ? isError : null,
+  };
 }
 
 /** Prefix identifying a tool-call header line in the output. */
@@ -97,6 +117,7 @@ function collectToolUse(
   toolCalls: ToolCall[] | null,
 ): void {
   const name = typeof block["name"] === "string" ? block["name"] : "";
+  const id = block["id"];
   if (name !== "") out.push(`${TOOL_MARK} ${name}`);
 
   const input = block["input"];
@@ -112,7 +133,12 @@ function collectToolUse(
   // A nameless, pathless call matches neither filter and would only render as
   // an empty `[]` label.
   if (name !== "" || paths.length > 0) {
-    toolCalls?.push({ name, paths, ...(input != null ? { input } : {}) });
+    toolCalls?.push({
+      ...(typeof id === "string" && id !== "" ? { id } : {}),
+      name,
+      paths,
+      ...(input != null ? { input } : {}),
+    });
   }
 }
 

@@ -1,6 +1,10 @@
 import { expect, test } from "vitest";
 
-import { extractContent, extractTextLines } from "../src/textExtract.js";
+import {
+  extractContent,
+  extractTextLines,
+  renderValue,
+} from "../src/textExtract.js";
 
 test("plain string content", () => {
   expect(extractTextLines("hello world")).toEqual(["hello world"]);
@@ -255,4 +259,72 @@ test("a real call is still collected after a tool_result in the same turn", () =
   expect(toolCalls).toEqual([
     { name: "Edit", paths: ["/e"], input: { file_path: "/e" } },
   ]);
+});
+
+test("tool_use carries its block id; a missing or empty id is omitted", () => {
+  const { toolCalls } = extractContent([
+    { type: "tool_use", id: "toolu_1", name: "Bash", input: { command: "ls" } },
+    { type: "tool_use", id: "", name: "Read", input: {} },
+    { type: "tool_use", name: "Grep", input: {} },
+  ]);
+  expect(toolCalls.map((c) => c.id)).toEqual(["toolu_1", undefined, undefined]);
+  expect(toolCalls[1]).not.toHaveProperty("id");
+  expect(toolCalls[2]).not.toHaveProperty("id");
+});
+
+test("tool_result maps is_error true / false / absent to true / false / null", () => {
+  const { toolResults } = extractContent([
+    { type: "tool_result", tool_use_id: "a", is_error: true, content: "no" },
+    { type: "tool_result", tool_use_id: "b", is_error: false, content: "ok" },
+    { type: "tool_result", tool_use_id: "c", content: "unknown" },
+  ]);
+  expect(toolResults).toStrictEqual([
+    { callId: "a", isError: true },
+    { callId: "b", isError: false },
+    { callId: "c", isError: null },
+  ]);
+});
+
+test("a non-boolean is_error is null, and a result without tool_use_id omits callId", () => {
+  const { toolResults } = extractContent([
+    { type: "tool_result", is_error: "true", content: "x" },
+    { type: "tool_result", tool_use_id: 7, is_error: 1, content: "y" },
+  ]);
+  expect(toolResults).toStrictEqual([{ isError: null }, { isError: null }]);
+});
+
+test("a tool_result nested inside another result's content is data, not a result", () => {
+  const { toolResults, textLines } = extractContent([
+    {
+      type: "tool_result",
+      tool_use_id: "outer",
+      content: [
+        { type: "text", text: "echoed" },
+        { type: "tool_result", tool_use_id: "inner", is_error: true },
+      ],
+    },
+  ]);
+  expect(toolResults).toStrictEqual([{ callId: "outer", isError: null }]);
+  expect(textLines).toEqual(["echoed"]);
+});
+
+test("an empty tool_result still yields a result and no text", () => {
+  const { toolResults, textLines } = extractContent([
+    { type: "tool_result", tool_use_id: "e", content: "" },
+  ]);
+  expect(textLines).toEqual([]);
+  expect(toolResults).toStrictEqual([{ callId: "e", isError: null }]);
+});
+
+test("results are listed in source order across one content array", () => {
+  const { toolResults } = extractContent([
+    { type: "tool_result", tool_use_id: "1", content: "a" },
+    { type: "text", text: "between" },
+    { type: "tool_result", tool_use_id: "2", content: "b" },
+  ]);
+  expect(toolResults.map((r) => r.callId)).toEqual(["1", "2"]);
+});
+
+test("a value JSON cannot serialise renders as nothing rather than throwing", () => {
+  expect(renderValue(1n)).toBe("");
 });

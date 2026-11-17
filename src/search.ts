@@ -25,7 +25,12 @@ export async function* search(opts: Options): AsyncGenerator<Hit> {
         for (const [i, line] of turn.textLines.entries()) {
           if (matcher.test(line)) matchedLineIndices.push(i);
         }
-        if (matchedLineIndices.length > 0) {
+        // A turn with no text (an empty tool result) has no line to match, so
+        // only a patternless search or dump, which asks for every turn, keeps it.
+        const wanted =
+          matchedLineIndices.length > 0 ||
+          (opts.pattern === undefined && turn.textLines.length === 0);
+        if (wanted) {
           yield { turn, matchedLineIndices };
           yielded++;
           if (opts.maxCount !== undefined && yielded >= opts.maxCount) return;
