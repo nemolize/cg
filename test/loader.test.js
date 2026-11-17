@@ -140,6 +140,29 @@ test("loadTurns reads origin.kind and turnOrigin, ignoring non-string values", a
   });
 });
 
+test("loadTurns reads message.id as messageId, ignoring a non-string id and a non-record message", async () => {
+  await withTempDir(async (dir) => {
+    const file = join(dir, "s.jsonl");
+    const line = (message) => JSON.stringify({ type: "assistant", message });
+    await writeFile(
+      file,
+      [
+        line({ id: "msg_a", content: "x" }),
+        line({ id: 7, content: "x" }),
+        line({ content: "x" }),
+        line("x"),
+      ].join("\n") + "\n",
+    );
+    const turns = [];
+    for await (const t of loadTurns(file)) turns.push(t);
+    expect(turns.map((t) => t.messageId)).toEqual([
+      "msg_a",
+      undefined,
+      undefined,
+    ]);
+  });
+});
+
 test("loadTurns carries isSidechain and agentId through", async () => {
   await withTempDir(async (dir) => {
     const file = join(dir, "s.jsonl");

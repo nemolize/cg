@@ -326,6 +326,7 @@ export function formatHitJson(hit: Hit, opts: Options, home: string): string {
             : { parentSessionId: turn.sessionId }),
         }
       : {}),
+    ...(turn.messageId !== undefined ? { messageId: turn.messageId } : {}),
     ...(turn.toolCalls.length > 0 ? { toolCalls: turn.toolCalls } : {}),
     ...(turn.toolResults.length > 0 ? { toolResults: turn.toolResults } : {}),
     matchedLines: everyLineMatched
