@@ -4,6 +4,8 @@ on:
   pull_request:
     # Label changes must re-run this check alone, without re-running the build matrix in ci.yml.
     types: [opened, synchronize, reopened, labeled, unlabeled]
+  # release.yml dispatches this on the Version Packages PR, which starts no pull_request run.
+  workflow_dispatch:
 
 permissions:
   contents: read

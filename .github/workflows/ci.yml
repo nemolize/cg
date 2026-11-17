@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # release.yml dispatches this on the Version Packages PR, which starts no pull_request run.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,7 +13,7 @@ permissions:
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
   # Cancelling an in-progress main run would leave that commit with no CI verdict.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
   build:
