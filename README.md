@@ -217,8 +217,9 @@ prompts, and SDK prompts. A line with neither field is judged by the text rule
 alone. It is still not strictly "what the human typed":
 
 - subagent orchestrator prompts count as `user` text — add `--subagents exclude`;
-- Claude lines without an origin field — older transcripts, the output of a
-  `!` shell command, interrupt markers — are not detected;
+- Claude lines without an origin field are not detected: messages from another
+  Claude session in the same team (the largest group on current versions),
+  older transcripts, the output of a `!` shell command, interrupt markers;
 - Codex's injected context is likewise not detected.
 
 `--role human` drops `isMeta` turns even with `--include-meta`.
