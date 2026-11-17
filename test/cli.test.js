@@ -672,3 +672,100 @@ test("--json carries messageId so the lines of one reply group in jq", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// The README's recipes are run as written, `cg` arguments and `jq` program
+// both: a test of a copy would stay green while the documented text drifted.
+function readmeRecipe(heading) {
+  const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
+  const start = readme.indexOf(`### ${heading}\n`);
+  if (start === -1) throw new Error(`no section "${heading}"`);
+  const match = /^cg (.*) \| jq (-\w+ )?'([^']*)'/m.exec(readme.slice(start));
+  if (match === null) throw new Error(`no recipe under "${heading}"`);
+  return {
+    args: match[1].split(" "),
+    flags: match[2]?.trim(),
+    program: match[3],
+  };
+}
+
+function runRecipe(heading, root) {
+  const { args, flags, program } = readmeRecipe(heading);
+  return JSON.parse(
+    execFileSync("jq", [...(flags === undefined ? [] : [flags]), program], {
+      encoding: "utf8",
+      input: runCli([...args, "--root", root]),
+    }),
+  );
+}
+
+const daysAgo = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
+
+test("the sessions-active recipe counts sessions, not turns, per project", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
+  const turn = (sessionId, cwd, timestamp) =>
+    JSON.stringify({
+      type: "user",
+      sessionId,
+      timestamp,
+      cwd,
+      message: { content: "hello" },
+    });
+  writeFileSync(
+    join(dir, "a.jsonl"),
+    [
+      turn("s1", "/proj-a", daysAgo(10)),
+      turn("s1", "/proj-a", daysAgo(2)),
+      turn("s2", "/proj-a", daysAgo(5)),
+      turn("s3", "/proj-b", daysAgo(8)),
+      turn("s4", "/proj-b", daysAgo(90)),
+    ].join("\n"),
+  );
+  try {
+    expect(runRecipe("Sessions active per project", dir)).toStrictEqual([
+      { cwd: "/proj-a", sessionsActive: 2 },
+      { cwd: "/proj-b", sessionsActive: 1 },
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the edit-attempts recipe counts Edit and Write calls per file, not the other calls in a turn", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
+  const call = (name, file) => ({
+    type: "tool_use",
+    id: `${name}-${file}`,
+    name,
+    input: { file_path: file },
+  });
+  const turn = (sessionId, blocks) =>
+    JSON.stringify({
+      type: "assistant",
+      sessionId,
+      timestamp: daysAgo(1),
+      cwd: "/proj",
+      message: { content: blocks },
+    });
+  // y.ts is read in a turn that also edits x.ts: --tool keeps the turn, so
+  // only the recipe's own filter drops the Read.
+  writeFileSync(
+    join(dir, "a.jsonl"),
+    [
+      turn("s1", [call("Edit", "/proj/x.ts"), call("Read", "/proj/y.ts")]),
+      turn("s1", [call("Write", "/proj/x.ts")]),
+      turn("s2", [call("Edit", "/proj/x.ts")]),
+      turn("s2", [call("Edit", "/proj/z.ts"), call("Edit", "/proj/z.ts")]),
+      turn("s3", [call("Write", "/proj/w.ts")]),
+      turn("s3", [call("Grep", "/proj/x.ts")]),
+    ].join("\n"),
+  );
+  try {
+    expect(runRecipe("Edit attempts per file", dir)).toStrictEqual([
+      { file: "/proj/x.ts", attempts: 3 },
+      { file: "/proj/z.ts", attempts: 2 },
+      { file: "/proj/w.ts", attempts: 1 },
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
