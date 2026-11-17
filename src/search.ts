@@ -7,9 +7,10 @@ import type { Hit, Options } from "./types.js";
 /**
  * Stream hits across every transcript under each of `opts.roots`. For each turn that
  * passes the metadata filters, the matcher is run per text line; a turn with
- * ≥1 matching line yields one `Hit` carrying the matched line indices. Files
- * are processed sequentially and lazily so a large corpus streams rather than
- * loading wholesale.
+ * ≥1 matching line yields one `Hit` carrying the matched line indices, and
+ * with no pattern a turn with no text lines does too. Files are processed
+ * sequentially and lazily so a large corpus streams rather than loading
+ * wholesale.
  */
 export async function* search(opts: Options): AsyncGenerator<Hit> {
   const matcher = buildMatcher(opts);

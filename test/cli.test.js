@@ -505,6 +505,7 @@ test("--json links results to calls, and an empty result is searchable only with
       "never",
     ]);
     expect(text).toContain("dddddddd");
+    expect(text.trimEnd()).toMatch(/\nuser {2}\d{4}-\d\d-\d\d \d\d:\d\d$/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

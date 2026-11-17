@@ -255,9 +255,10 @@ A call's `id` is the identifier its result answers, and a turn carrying results
 has a turn-level `toolResults` array (`{callId, isError}`), one entry per result
 in source order — an array because one Claude line can hold several. The two
 join in `jq` on `toolCalls[].id == toolResults[].callId`, even across separate
-lines. A turn with no calls or results omits the key, as `toolCalls` does; `id`
-and `callId` are omitted when the source records none, while `isError` is always
-present.
+lines — each hit is its own JSON line, so the join needs a stream-wide filter
+(`jq -s`, or `jq -n '[inputs]'`); a per-line filter sees only one side. A turn
+with no calls or results omits the key, as `toolCalls` does; `id` and `callId`
+are omitted when the source records none, while `isError` is always present.
 
 | Source | Call (`id`)                                                          | Result (`callId`)                                              | `isError`                              |
 | ------ | -------------------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------- |
