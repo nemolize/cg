@@ -43,6 +43,8 @@ export interface Turn {
   /** Claude's `origin.kind` / `turnOrigin` (`human`, `plugin`, `scheduled`, …); either may be absent. */
   origin?: string | undefined;
   turnOrigin?: string | undefined;
+  /** Claude `user` text wrapped as a message from another session. */
+  isForwardedEnvelope?: boolean | undefined;
   /** Claude's `message.id`, shared by every line of one assistant reply; absent on lines without one and on Codex. */
   messageId?: string | undefined;
   /**

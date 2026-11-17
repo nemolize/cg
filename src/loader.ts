@@ -105,6 +105,9 @@ function carriesCodexFileState(line: string): boolean {
   return line.includes('"session_meta"') || line.includes('"turn_context"');
 }
 
+const FORWARDED_ENVELOPE =
+  /^Another Claude session sent a message:\r?\n<(?:teammate-message|agent-message|cross-session-message)(?=[ \t>])/;
+
 function parseClaudeLine(
   file: string,
   lineIndex: number,
@@ -154,6 +157,10 @@ function parseClaudeLine(
     origin: typeof originKind === "string" ? originKind : undefined,
     turnOrigin:
       typeof obj["turnOrigin"] === "string" ? obj["turnOrigin"] : undefined,
+    isForwardedEnvelope:
+      role === "user" &&
+      typeof message["content"] === "string" &&
+      FORWARDED_ENVELOPE.test(message["content"]),
     messageId: typeof message["id"] === "string" ? message["id"] : undefined,
     isSidechain: obj["isSidechain"] === true,
     agentId: typeof obj["agentId"] === "string" ? obj["agentId"] : undefined,
