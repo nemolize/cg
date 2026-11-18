@@ -18,6 +18,8 @@ import { isRecord } from "./guards.js";
 import { isReadableDir } from "./loader.js";
 import { search } from "./search.js";
 import type { Hit, Options, ResolvedRoot, TranscriptSource } from "./types.js";
+import { formatUsageJson } from "./usage.js";
+import { scanUsage } from "./usageScan.js";
 
 /** Read at runtime rather than hardcoded: a literal drifts from package.json on release. */
 function readVersion(): string {
@@ -127,6 +129,15 @@ async function main(): Promise<number> {
           `searched Claude only\n`,
       );
     }
+  }
+
+  if (opts.usage) {
+    let records = 0;
+    for await (const event of scanUsage(opts)) {
+      records++;
+      await writeStdout(formatUsageJson(event) + "\n");
+    }
+    return records > 0 ? 0 : 1;
   }
 
   // Typed `boolean`, but Node leaves it `undefined` when stdout is not a TTY.

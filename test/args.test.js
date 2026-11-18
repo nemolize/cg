@@ -541,3 +541,95 @@ test("help says both resume flags refuse --json", () => {
     expect(lines.slice(at, at + 3).join("\n")).toContain("not with --json");
   }
 });
+
+test("--usage stands in for the pattern and takes only the scope options", () => {
+  const r = parse([
+    "--usage",
+    "--source",
+    "claude",
+    "--root",
+    "/r",
+    "--codex-root",
+    "/c",
+    "--session",
+    "abc",
+    "--subagents",
+    "exclude",
+    "--since",
+    "7d",
+    "--until",
+    "1d",
+    "--cwd",
+    "x",
+    "--branch",
+    "y",
+    "--color",
+    "never",
+  ]);
+  expect(r.kind).toBe("options");
+  if (r.kind === "options") {
+    expect(r.options.usage).toBe(true);
+    expect(r.options.pattern).toBe(undefined);
+    expect(r.options.subagents).toBe("exclude");
+  }
+});
+
+test("--usage counts subagents unless told otherwise, --session included", () => {
+  for (const argv of [["--usage"], ["--usage", "--session", "abc"]]) {
+    const r = parse(argv);
+    if (r.kind !== "options") throw new Error("expected options");
+    expect(r.options.subagents).toBe("include");
+  }
+  const alias = parse(["--usage", "--include-subagents"]);
+  expect(alias.kind).toBe("options");
+});
+
+test("--usage is off unless given", () => {
+  const r = parse(["x"]);
+  if (r.kind !== "options") throw new Error("expected options");
+  expect(r.options.usage).toBe(false);
+});
+
+test("--usage with a pattern or a text filter is a usage error naming the flag", () => {
+  const refused = [
+    [["--usage", "needle"], "a search pattern"],
+    [["--usage", "--role", "human"], "--role"],
+    [["--usage", "--role", "any"], "--role"],
+    [["--usage", "--tool", "Edit"], "--tool"],
+    [["--usage", "--file", "x.ts"], "--file"],
+    [["--usage", "--include-meta"], "--include-meta"],
+    [["--usage", "-e"], "--regex (-e)"],
+    [["--usage", "-F"], "--fixed (-F)"],
+    [["--usage", "-i"], "--ignore-case (-i)"],
+    [["--usage", "-C", "3"], "--context (-C)"],
+    [["--usage", "-c"], "--count (-c)"],
+    [["--usage", "-l"], "--list-sessions (-l)"],
+    [["--usage", "-m", "5"], "--max-count (-m)"],
+    [["--usage", "--json"], "--json"],
+    [["--usage", "--resume"], "--resume"],
+    [["--usage", "--print-resume"], "--print-resume"],
+  ];
+  for (const [argv, named] of refused) {
+    expect(parse(argv)).toStrictEqual({
+      kind: "error",
+      message: `--usage cannot be combined with ${named}`,
+    });
+  }
+});
+
+test("--help documents --usage, its keys, final and both dedupe rules", () => {
+  expect(HELP).toContain("--usage");
+  for (const word of [
+    "inputTokens",
+    "cachedInputTokens",
+    "cacheCreationInputTokens",
+    "outputTokens",
+    "reasoningOutputTokens",
+    "totalTokens",
+    "final",
+    "smallest path",
+    "fork",
+  ]) {
+    expect(HELP).toContain(word);
+  }
+});

@@ -843,3 +843,51 @@ test.each(["--resume", "--print-resume"])(
     });
   },
 );
+
+test("--usage prints one record per reply, whatever the text filters would select", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-"));
+  const reply = (id, text) =>
+    JSON.stringify({
+      type: "assistant",
+      sessionId: "s1",
+      timestamp: "2026-11-01T00:00:00Z",
+      message: {
+        id,
+        stop_reason: "end_turn",
+        usage: {
+          input_tokens: 1,
+          cache_read_input_tokens: 2,
+          cache_creation_input_tokens: 3,
+          output_tokens: 4,
+        },
+        content: [{ type: "text", text }],
+      },
+    });
+  writeFileSync(
+    join(dir, "a.jsonl"),
+    [reply("m1", "needle"), reply("m2", "other")].join("\n"),
+  );
+  try {
+    const out = runCli(["--usage", "--source", "claude", "--root", dir]);
+    const records = out
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+    expect(records.map((r) => r.messageId)).toStrictEqual(["m1", "m2"]);
+    expect(records[0].usage).toStrictEqual({
+      inputTokens: 6,
+      cachedInputTokens: 2,
+      cacheCreationInputTokens: 3,
+      outputTokens: 4,
+      totalTokens: 10,
+    });
+    const refused = spawnCli(["--usage", "needle", "--root", dir]);
+    expect(refused.status).toBe(2);
+    expect(refused.stderr).toContain("--usage cannot be combined with");
+    const none = spawnCli(["--usage", "--since", "1h", "--root", dir]);
+    expect(none.status).toBe(1);
+    expect(none.stdout).toBe("");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
