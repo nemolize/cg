@@ -1,5 +1,35 @@
 # @nemolize/cc-grep
 
+## 0.10.0
+
+### Minor Changes
+
+- [#221](https://github.com/nemolize/cg/pull/221) [`287d988`](https://github.com/nemolize/cg/commit/287d98859f63209f03d83c5c42cfb208049e6dcd) - `--json` now lists the content kinds each turn carries in `contentKinds` (`text`, `thinking`, `tool_use`, `tool_result`, `image`), and `--role human` keeps only `user` turns that carry text, leaving out Claude's tool-result lines (command output still counts). `--role user` is unchanged.
+
+- [#225](https://github.com/nemolize/cg/pull/225) [`2a30a1f`](https://github.com/nemolize/cg/commit/2a30a1f7bcbba68e48cb8fa45d3904817e8a1395) - `--json` now carries `messageId` on Claude hits, copied from `message.id`, so the lines of one assistant reply can be grouped in `jq`. Lines without a `message.id` and all Codex hits omit it.
+
+- [#220](https://github.com/nemolize/cg/pull/220) [`5881e38`](https://github.com/nemolize/cg/commit/5881e38b513d1dd9d8a5f876d5961b94d6097ab3) - `--json` now links each tool result to its call: `toolCalls[].id` and a turn-level `toolResults` array of `{callId, isError}`. `isError` is Claude's `is_error`, and `null` wherever the source records none. Results with an empty body are emitted too.
+
+- [#229](https://github.com/nemolize/cg/pull/229) [`4d596fd`](https://github.com/nemolize/cg/commit/4d596fd75e9a423f02545df643cd3fdbc7535528) - `--json` no longer needs a search pattern: without one it emits every turn that passes the other filters, turns with no text included, and `--json -c` / `--json -l` summarise them. Without `--json` a missing pattern is still an error.
+
+- [#238](https://github.com/nemolize/cg/pull/238) [`1314815`](https://github.com/nemolize/cg/commit/1314815a1066455c08e0ef38f032e0fe9199e62a) - `--role human` now drops the output of `!` shell commands even when the line records `turnOrigin: human`, which is how Claude Code records almost all of it. A user line whose whole string is one `<bash-stdout>` element, optionally followed by one `<bash-stderr>` element, is dropped whatever origin it records. The `<bash-input>` line the human typed, and anything that only resembles the form, is kept. Local-command records (`<local-command-stdout>`, `/clear`) keep the earlier rule: dropped only when no origin is recorded. `--role user` is unchanged.
+
+- [#232](https://github.com/nemolize/cg/pull/232) [`002f54e`](https://github.com/nemolize/cg/commit/002f54e6b1f0edfdf7b7814327498e4def9b0e6b) - `--role human` now drops Claude user lines that are messages forwarded from another session (a text starting `Another Claude session sent a message:` and a `teammate-message`, `agent-message` or `cross-session-message` tag), which record no `origin`. A line that records `human` is kept; `--role user` is unchanged.
+
+- [#235](https://github.com/nemolize/cg/pull/235) [`622fb89`](https://github.com/nemolize/cg/commit/622fb890def23e4c6b36311e74c191336d023f32) - `--role human` now also drops Claude Code's interrupt markers, a user line whose only content is the text `[Request interrupted by user]` or `[Request interrupted by user for tool use]` and which records no `origin`. Anything that only resembles them is kept; `--role user` is unchanged.
+
+- [#236](https://github.com/nemolize/cg/pull/236) [`2d3f72b`](https://github.com/nemolize/cg/commit/2d3f72bc015537a8125f81449a9d8a8dbdec951a) - `--role human` now also drops Claude Code's own records of local commands: a user line that records neither `origin` nor `turnOrigin` and whose whole text is one `<local-command-stdout>` / `<local-command-stderr>` element, or a `<command-name>` record with no arguments such as `/clear`. Anything that only resembles them is kept, including a command record with arguments and the `<bash-input>` line the human typed. `--role user` is unchanged.
+
+- [#223](https://github.com/nemolize/cg/pull/223) [`463acc1`](https://github.com/nemolize/cg/commit/463acc1d9c5ad2bc26d7c45e044f31d3d6063d6c) - `--role human` now drops Claude lines whose `origin.kind` or `turnOrigin` is not `human`, so background-task notices, scheduled and plugin prompts no longer count as typed text. Lines with neither field are judged as before.
+
+- [#243](https://github.com/nemolize/cg/pull/243) [`e180b33`](https://github.com/nemolize/cg/commit/e180b33b925a474525cefecf536768d7a620c970) - New `--usage` flag: one JSON line per Claude reply and per Codex model call, carrying its token usage (`inputTokens`, `cachedInputTokens`, `cacheCreationInputTokens`, `outputTokens`, `reasoningOutputTokens`, `totalTokens`) so a per-reply figure sums in `jq` without double-counting or dropping any. It is independent of text filters, so it takes only the scope options (`--source`, `--root`, `--codex-root`, `--session`, `--subagents`, `--since`, `--until`, `--cwd`, `--branch`, `--color`); a pattern or any other flag is a usage error. A Claude reply split over several lines yields one record (`final: false` when no line carried its final usage), a `message.id` found in several files counts once, and a Codex event repeating the previous one, or replayed from a fork's parent, is skipped.
+
+### Patch Changes
+
+- [#217](https://github.com/nemolize/cg/pull/217) [`097e7f6`](https://github.com/nemolize/cg/commit/097e7f678f7b148b7853f0fe6046ae85559c1553) - Codex tool calls whose arguments are `null` or `{}` no longer add a `null` / `{}` line, matching Claude's `tool_use`
+
+- [#239](https://github.com/nemolize/cg/pull/239) [`f2fca86`](https://github.com/nemolize/cg/commit/f2fca86964172f43fa84b98851f27a67adb7d3b9) - A transcript can no longer drive your terminal or your shell: control characters in printed text show as visible placeholders (`␛` for escape), and `--resume` / `--print-resume` print a command only for a session id made of letters, digits, `-` and `_`. `--since` / `--until` now accept only a duration (`7d`), an ISO date (`2026-06-01`) or an ISO datetime (`2026-06-01T12:00:00Z`, offset as `±HH:MM`), so a bare number (`7`), a day that does not exist (`2026-02-30`), a spaced duration (`7 d`) and other date spellings (`June 1 2026`) are usage errors instead of being read as some other date, a zero-width regex match (`^`, `\b`) no longer highlights a character, and `--json` with `--resume` / `--print-resume` is a usage error rather than silently ignoring the flag.
+
 ## 0.9.0
 
 ### Minor Changes
