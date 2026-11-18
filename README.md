@@ -377,9 +377,9 @@ Each record keeps the `--json` keys with their meaning — `file`, `lineIndex`,
 `parentSessionId`, `messageId` (Claude only) — plus:
 
 - `final` (Claude only) — `true` when the record's usage is the reply's final
-  one, `false` when no line of the reply carried it (an interrupted reply from
-  Claude Code 2.1.306 or older, whose `outputTokens` is then a placeholder that
-  undercounts; the input-side counts are right).
+  one, `false` when no line of the reply carried it (a reply that was
+  interrupted or cut off, in any Claude Code version, whose `outputTokens` is
+  then a placeholder that undercounts; the input-side counts are right).
 - `usage` — `inputTokens` (all input, cache included), `cachedInputTokens`,
   `cacheCreationInputTokens`, `outputTokens`, `reasoningOutputTokens` (Codex
   only) and `totalTokens` (input + output). For Claude, `inputTokens` is
@@ -393,9 +393,9 @@ Each record keeps the `--json` keys with their meaning — `file`, `lineIndex`,
 several lines it is the final line, not the first as in `--json`.
 
 **One record per Claude reply, and per `message.id`.** The lines of a reply share
-a `message.id`. From Claude Code 2.1.307 every line carries the same final usage;
-before that, early lines carry placeholders and only the line with a
-`stop_reason` or `usage.iterations` is final. The record takes the last such
+a `message.id`. In a completed reply from Claude Code 2.1.307 every line carries
+the same final usage; before that, early lines carry placeholders and only the
+line with a `stop_reason` or `usage.iterations` is final. The record takes the last such
 line. A `message.id` that appears in several files (resumed or forked history)
 yields one record, from the file with the smallest path among the files in scope.
 
@@ -408,6 +408,13 @@ forked rollout replays its parent's events: when the `forked_from_id` rollout is
 among the files in scope, a child event whose whole `info` also appears in that
 parent is left to the parent, and the child's own events are emitted. Codex has no
 reply id, so a record is tied to its model call only by position in the rollout.
+
+Both rules judge "in scope" after the scope options apply, so the records of two
+disjoint scopes (`--subagents only` plus `--subagents exclude`, or `--session`
+for a fork and for its parent) can add up to more than the unscoped total when a
+reply or a replayed event sits in files of both. A fork whose parent rollout is
+not among the files read (`.zst`, outside `--codex-root`, deleted) keeps its
+replayed events, so they are counted again.
 
 Rollouts compressed to `.zst` are not read.
 
