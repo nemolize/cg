@@ -56,20 +56,28 @@ export async function* loadTurns(
   prefilter?: Prefilter,
   source: TranscriptSource = "claude",
 ): AsyncGenerator<Turn> {
+  const codexState = source === "codex" ? newCodexFileState() : undefined;
+  for await (const { lineIndex, line } of readJsonlLines(file)) {
+    const turn =
+      codexState === undefined
+        ? parseClaudeLine(file, lineIndex, line, prefilter)
+        : parseCodexFileLine(file, lineIndex, line, prefilter, codexState);
+    if (turn) yield turn;
+  }
+}
+
+export async function* readJsonlLines(
+  file: string,
+): AsyncGenerator<{ lineIndex: number; line: string }> {
   const stream = createReadStream(file, { encoding: "utf8" });
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
   let lineIndex = -1;
-  const codexState = source === "codex" ? newCodexFileState() : undefined;
   try {
     for await (const line of rl) {
       lineIndex++;
       if (line.length === 0) continue;
       if (line.length > MAX_JSONL_RECORD_CHARS) continue;
-      const turn =
-        codexState === undefined
-          ? parseClaudeLine(file, lineIndex, line, prefilter)
-          : parseCodexFileLine(file, lineIndex, line, prefilter, codexState);
-      if (turn) yield turn;
+      yield { lineIndex, line };
     }
   } catch {
     return; // unreadable file — skip, don't crash the scan

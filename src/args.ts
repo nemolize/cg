@@ -18,6 +18,7 @@ Usage:
   cg --session <id> [pattern] [options]
   cg --tool <name[,name...]> [--file <substring>] [pattern] [options]
   cg --json [pattern] [options]
+  cg --usage [scope options]
 
 Pattern:
   Substring match by default. A pattern starting with - needs -- before it
@@ -71,6 +72,23 @@ Context & output:
                        or a single {"hits":N} with -c (pipeline-friendly);
                        the pattern is optional, and without one every turn
                        that passes the filters is emitted
+  --usage              Emit one token-usage JSON object per Claude reply and per
+                       Codex model call, independent of any text filter. Takes
+                       only the scope options (--source, --root, --codex-root,
+                       --session, --subagents (default include), --since,
+                       --until, --cwd, --branch, --color) — a pattern or any
+                       other filter is a usage error. Keys: the --json keys
+                       file, lineIndex (the usage-carrying line), source, cwd,
+                       timestamp, sessionId, gitBranch, isSubagent, agentId,
+                       parentSessionId, messageId (Claude), plus final (Claude:
+                       false when no line of the reply carried its final usage)
+                       and usage {inputTokens (cache included), cachedInputTokens,
+                       cacheCreationInputTokens, outputTokens,
+                       reasoningOutputTokens (Codex), totalTokens}; a key whose
+                       source field is missing or invalid is left out, never 0.
+                       A message.id found in several files counts once (the
+                       smallest path); a Codex event repeating the previous
+                       event's info, or replayed from a fork's parent, is dropped
   --color <always|never|auto>   Colorize output (default: auto)
   --resume             Print the resume command for the top hit
                        (\`claude --resume <id>\` / \`codex resume <id>\`);
@@ -121,6 +139,7 @@ const ARG_OPTIONS = {
   count: { type: "boolean", short: "c" },
   "list-sessions": { type: "boolean", short: "l" },
   json: { type: "boolean" },
+  usage: { type: "boolean" },
   color: { type: "string" },
   resume: { type: "boolean" },
   "print-resume": { type: "boolean" },
@@ -203,6 +222,13 @@ export function parseArgs(
     return err(`unexpected extra argument: "${positionals[1]}"`);
   }
 
+  if (values.usage === true) {
+    const conflict = usageConflict(values, pattern);
+    if (conflict !== undefined) {
+      return err(`--usage cannot be combined with ${conflict}`);
+    }
+  }
+
   const roleValue = values.role;
   if (
     roleValue !== undefined &&
@@ -231,9 +257,12 @@ export function parseArgs(
   if (subagentsValue !== undefined && values["include-subagents"] === true) {
     return err("--subagents and --include-subagents cannot be combined");
   }
+  // Billing counts subagents, so `--session` must not default them out.
   const subagents: SubagentScope | undefined =
     subagentsValue ??
-    (values["include-subagents"] === true ? "include" : undefined);
+    (values["include-subagents"] === true || values.usage === true
+      ? "include"
+      : undefined);
 
   let sinceMs: number | undefined;
   let untilMs: number | undefined;
@@ -289,7 +318,8 @@ export function parseArgs(
     session === undefined &&
     tools === undefined &&
     values.file === undefined &&
-    values.json !== true
+    values.json !== true &&
+    values.usage !== true
   ) {
     return err("missing search pattern");
   }
@@ -406,9 +436,38 @@ export function parseArgs(
       resume: values.resume ?? false,
       printResume: values["print-resume"] ?? false,
       json: values.json ?? false,
+      usage: values.usage ?? false,
       color,
     },
   };
+}
+
+const USAGE_REFUSED_FLAGS: readonly [
+  keyof ReturnType<typeof parseConfiguredArgs>["values"],
+  string,
+][] = [
+  ["role", "--role"],
+  ["tool", "--tool"],
+  ["file", "--file"],
+  ["include-meta", "--include-meta"],
+  ["regex", "--regex (-e)"],
+  ["fixed", "--fixed (-F)"],
+  ["ignore-case", "--ignore-case (-i)"],
+  ["context", "--context (-C)"],
+  ["count", "--count (-c)"],
+  ["list-sessions", "--list-sessions (-l)"],
+  ["max-count", "--max-count (-m)"],
+  ["json", "--json"],
+  ["resume", "--resume"],
+  ["print-resume", "--print-resume"],
+];
+
+function usageConflict(
+  values: ReturnType<typeof parseConfiguredArgs>["values"],
+  pattern: string | undefined,
+): string | undefined {
+  if (pattern !== undefined) return "a search pattern";
+  return USAGE_REFUSED_FLAGS.find(([key]) => values[key] !== undefined)?.[1];
 }
 
 function err(message: string): ParseResult {

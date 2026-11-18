@@ -118,6 +118,7 @@ export interface Options {
   resume: boolean;
   printResume: boolean;
   json: boolean;
+  usage: boolean;
   color: ColorMode;
   ignoreCase: boolean;
 }

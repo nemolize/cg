@@ -36,6 +36,7 @@ cg --session <id> [pattern]         # read one session as a conversation
 cg --source codex <pattern>         # one agent's transcripts only
 cg --tool Edit --file <path>        # which session touched a file (Claude)
 cg --json [options]                 # every turn as JSON, no pattern needed
+cg --usage [scope options]          # one token-usage record per reply
 ```
 
 ```
@@ -354,6 +355,69 @@ Codex has no `messageId`: its records carry no reply-level id. A record's own
 `id` names that record, and the `turn_id` its rollouts share spans a whole
 turn — several model steps — so it is not exposed.
 
+## Token usage
+
+`cg --usage` prints one JSON object per line for every Claude reply and every
+Codex model call, carrying its token usage. It is a separate output from `--json`
+because hits are lines and billing is per reply: a text or role filter would
+thin the sums. So `--usage` takes only the scope options (`--source`, `--root`,
+`--codex-root`, `--session`, `--subagents`, `--since`, `--until`, `--cwd`,
+`--branch`, `--color`), and a pattern or any other flag (`--role`, `--tool`,
+`--file`, `--include-meta`, `-e`/`-F`/`-i`, `-C`, `-c`, `-l`, `-m`, `--json`,
+`--resume`, `--print-resume`) is a usage error naming it. Unlike a search,
+`--subagents` defaults to `include`, `--session` included. Summing and grouping
+are left to `jq`; there is no price conversion.
+
+```sh
+cg --usage --since 30d | jq -s 'map(.usage.totalTokens // 0) | add'
+```
+
+Each record keeps the `--json` keys with their meaning — `file`, `lineIndex`,
+`source`, `cwd`, `timestamp`, `sessionId`, `gitBranch`, `isSubagent`, `agentId`,
+`parentSessionId`, `messageId` (Claude only) — plus:
+
+- `final` (Claude only) — `true` when the record's usage is the reply's final
+  one, `false` when no line of the reply carried it (a reply that was
+  interrupted or cut off, in any Claude Code version, whose `outputTokens` is
+  then a placeholder that undercounts; the input-side counts are right).
+- `usage` — `inputTokens` (all input, cache included), `cachedInputTokens`,
+  `cacheCreationInputTokens`, `outputTokens`, `reasoningOutputTokens` (Codex
+  only) and `totalTokens` (input + output). For Claude, `inputTokens` is
+  `input_tokens` + `cache_read_input_tokens` + `cache_creation_input_tokens`; for
+  Codex it is `input_tokens`, with `cache_write_input_tokens` as
+  `cacheCreationInputTokens`. A key whose source field is missing or not a
+  non-negative integer is left out, never `0`; `inputTokens` needs all three
+  Claude fields, and `totalTokens` needs both input and output.
+
+`lineIndex` is the line that carried the usage, so for a reply split over
+several lines it is the final line, not the first as in `--json`.
+
+**One record per Claude reply, and per `message.id`.** The lines of a reply share
+a `message.id`. In a completed reply from Claude Code 2.1.307 every line carries
+the same final usage; before that, early lines carry placeholders and only the
+line with a `stop_reason` or `usage.iterations` is final. The record takes the last such
+line. A `message.id` that appears in several files (resumed or forked history)
+yields one record, from the file with the smallest path among the files in scope.
+
+**One record per Codex model call.** A `token_count` event whose whole `info`
+equals the previous event's in the same file (a rate-limit refresh), and one
+with `info: null`, emit nothing, so the `totalTokens` of a non-forked rollout
+sum to its last `total_token_usage.total_tokens`. The event after a `compacted`
+record records only `total_tokens`, so its record has only `totalTokens`. A
+forked rollout replays its parent's events: when the `forked_from_id` rollout is
+among the files in scope, a child event whose whole `info` also appears in that
+parent is left to the parent, and the child's own events are emitted. Codex has no
+reply id, so a record is tied to its model call only by position in the rollout.
+
+Both rules judge "in scope" after the scope options apply, so the records of two
+disjoint scopes (`--subagents only` plus `--subagents exclude`, or `--session`
+for a fork and for its parent) can add up to more than the unscoped total when a
+reply or a replayed event sits in files of both. A fork whose parent rollout is
+not among the files read (`.zst`, outside `--codex-root`, deleted) keeps its
+replayed events, so they are counted again.
+
+Rollouts compressed to `.zst` are not read.
+
 ## Aggregating with jq
 
 `cg` finds and prints records; counting them is left to `jq`, so the recipes
@@ -505,7 +569,7 @@ file — is in [Aggregating with jq](#aggregating-with-jq).
 
 ## Exit status
 
-`0` when at least one hit is found, `1` when none — including when a root you
+`0` when at least one hit (or, with `--usage`, one record) is found, `1` when none — including when a root you
 named turned out to be unreadable — and `2` on a usage error (following the
 `grep` convention).
 

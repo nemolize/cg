@@ -10,6 +10,7 @@ export interface CodexFileState {
   sessionId?: string | undefined;
   threadId?: string | undefined;
   cwd?: string | undefined;
+  forkedFromId?: string | undefined;
   isSubagent: boolean;
 }
 
@@ -36,6 +37,7 @@ function applySessionMeta(
   const threadSource = str(payload["thread_source"]);
   state.sessionId = str(payload["session_id"]) ?? str(payload["id"]);
   state.threadId = str(payload["id"]);
+  state.forkedFromId = str(payload["forked_from_id"]);
   state.isSubagent = threadSource !== undefined && threadSource !== "user";
 }
 
@@ -167,6 +169,23 @@ function readToolOutput(payload: Record<string, unknown>): string[] {
   return collectMessageText(output);
 }
 
+export function absorbCodexMeta(
+  lineType: unknown,
+  payload: Record<string, unknown>,
+  state: CodexFileState,
+): boolean {
+  if (lineType === "session_meta") {
+    applySessionMeta(payload, state);
+    return true;
+  }
+  if (lineType === "turn_context") {
+    const cwd = str(payload["cwd"]);
+    if (cwd !== undefined) state.cwd = cwd;
+    return true;
+  }
+  return false;
+}
+
 /**
  * Undefined for the bookkeeping records that dominate a rollout file, since
  * they hold no searchable text; `state` still absorbs metadata they carry.
@@ -189,15 +208,7 @@ export function parseCodexLine(
   if (payload === undefined) return undefined;
 
   const lineType = parsed["type"];
-  if (lineType === "session_meta") {
-    applySessionMeta(payload, state);
-    return undefined;
-  }
-  if (lineType === "turn_context") {
-    const cwd = str(payload["cwd"]);
-    if (cwd !== undefined) state.cwd = cwd;
-    return undefined;
-  }
+  if (absorbCodexMeta(lineType, payload, state)) return undefined;
   if (lineType !== "response_item") return undefined;
 
   let role: string;
