@@ -77,8 +77,21 @@ function sourceLabel(source: TranscriptSource): string {
   return source === "codex" ? "codex  " : "";
 }
 
+/**
+ * One-for-one, so highlight offsets computed afterwards still line up. Tab stays:
+ * it moves the cursor but cannot rewrite the screen the way ESC, CR or BEL can.
+ */
+function neutralizeControls(text: string): string {
+  return text.replace(/(?!\t)\p{Cc}/gu, (char) => {
+    const code = char.charCodeAt(0);
+    if (code < 0x20) return String.fromCharCode(0x2400 + code);
+    return code === 0x7f ? "\u2421" : "\uFFFD";
+  });
+}
+
 function cyan(text: string, color: boolean): string {
-  return color ? CYAN + text + RESET : text;
+  const safe = neutralizeControls(text);
+  return color ? CYAN + safe + RESET : safe;
 }
 
 function highlight(
@@ -209,7 +222,7 @@ export function formatHit(
     if (dec?.suppressed === true && !matched.has(i) && !orphanHeader) continue;
     // Ranges are recomputed on the shown text: a decorated line is not the
     // extracted one, so the raw line's offsets would highlight the wrong span.
-    const text = dec?.text ?? raw;
+    const text = neutralizeControls(dec?.text ?? raw);
     if (matched.has(i)) {
       body.push(`  │ >> ${highlight(text, matcher.ranges(text), color)}`);
       continue;
@@ -236,7 +249,7 @@ export function formatSessionLine(
   const unit = hits === 1 ? "hit " : "hits";
   return (
     cyan(sourceLabel(source) + id, color) +
-    `  ${String(hits).padStart(4)} ${unit}  ${shortenPath(cwd, home)}`
+    `  ${String(hits).padStart(4)} ${unit}  ${neutralizeControls(shortenPath(cwd, home))}`
   );
 }
 
@@ -286,7 +299,7 @@ export function formatDumpTurn(
   // The marker stays inline rather than moving to the header: one turn can hold
   // several calls, and a hoisted list would not say which block each name owns.
   const body = turn.textLines.map((raw, i) => {
-    const text = decorations[i]?.text ?? raw;
+    const text = neutralizeControls(decorations[i]?.text ?? raw);
     // `>>` keeps the match visible under `--color never` and through a pipe.
     return highlighting && matched.has(i)
       ? `  │ >> ${highlight(text, matcher.ranges(text), color)}`
@@ -338,6 +351,5 @@ export function formatHitJson(hit: Hit, opts: Options, home: string): string {
 /** The resume line for a hit, worded for the hit's own agent so a copied command cannot reopen it under the other. */
 export function resumeCommand(hit: Hit): string | undefined {
   const id = hit.turn.sessionId;
-  if (id === undefined || id === "") return undefined;
-  return resumeCommandFor(hit.turn.source, id);
+  return id === undefined ? undefined : resumeCommandFor(hit.turn.source, id);
 }

@@ -52,6 +52,8 @@ $ npx @nemolize/cg "auth flow"
 - `-e, --regex` — treat the pattern as a regular expression.
 - `-F, --fixed` — force literal match (overrides `--regex`).
 - `-i, --ignore-case` — case-insensitive match.
+- A pattern starting with `-` needs `--` before it, as with `grep`:
+  `cg -- -foo`.
 
 ### Scope
 
@@ -80,7 +82,9 @@ $ npx @nemolize/cg "auth flow"
   output. `human` keeps only `user` turns that carry text, not tool output — see
   [Telling typed text from tool output](#telling-typed-text-from-tool-output).
 - `--since <dur|date>` / `--until <dur|date>` — time window. Accepts a relative
-  duration (`7d`, `2h`, `30m`, `1w`) or an absolute date (`2026-06-01`).
+  duration (`7d`, `2h`, `30m`, `1w`), an ISO date (`2026-06-01`) or an ISO
+  datetime (`2026-06-01T12:00:00Z`). Anything else, a bare `7` or a day that does
+  not exist (`2026-02-30`) included, is a usage error.
 - `--cwd <substring>` — restrict to sessions whose working directory matches.
 - `--branch <substring>` — restrict by the git branch at session start.
 - `--tool <name[,name...]>` — restrict to turns that called one of these tools,
@@ -134,9 +138,13 @@ combination is a usage error rather than a silently dropped flag.
 - `--color <always|never|auto>` — colorize output (default: auto-detects a TTY).
 - `--resume` — print the resume command for the top hit only, worded for the
   agent that hit came from. Use once your filters have narrowed things down to
-  the session you want.
+  the session you want. A session id with anything beyond letters, digits, `-` and
+  `_` gets no command, since a transcript supplies it and the line is pasted into
+  a shell.
 - `--print-resume` — print the resume command for every hit. Use while
-  browsing, so any hit can be jumped into.
+  browsing, so any hit can be jumped into. Neither resume flag composes with
+  `--json`: JSON output carries no resume command, so the combination is a usage
+  error.
 
 ## Reading one session
 
@@ -408,7 +416,7 @@ two schemas express the same way works identically — the pattern, `--role`,
 
 JSON-encoded tool output is decoded once before matching and rendering, so `-C N`
 shows neighbouring output lines. Nested strings retain literal backslash escapes;
-non-JSON output stays verbatim. Patterns match the decoded text rather than its
+non-JSON output stays verbatim except for control characters, which print as visible placeholders (`␛` for escape) so a transcript cannot drive the terminal. Patterns match the decoded text rather than its
 JSON escaping or quoted object keys.
 
 Three filters read something Codex records differently, or not at all:

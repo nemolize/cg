@@ -15,8 +15,8 @@ export default defineConfig({
       // the numbers act as a ratchet rather than a target to drift down to.
       thresholds: {
         autoUpdate: true,
-        statements: 98.78,
-        branches: 95.44,
+        statements: 98.81,
+        branches: 95.7,
         functions: 100,
         lines: 99.84,
       },

@@ -517,3 +517,27 @@ test("--root marks the source it pins as explicit", () => {
 test("help documents --source", () => {
   expect(HELP).toMatch(/--source <claude\|codex\|both>/);
 });
+
+test.each(["--resume", "--print-resume"])(
+  "%s cannot combine with --json, which prints no resume command",
+  (resume) => {
+    const r = parse(["p", "--json", resume]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") {
+      expect(r.message).toContain(resume);
+      expect(r.message).toContain("--json");
+    }
+  },
+);
+
+test("help says a pattern starting with a dash needs --", () => {
+  expect(HELP).toContain("needs -- before it");
+});
+
+test("help says both resume flags refuse --json", () => {
+  const lines = HELP.split("\n");
+  for (const flag of ["--resume ", "--print-resume "]) {
+    const at = lines.findIndex((line) => line.trimStart().startsWith(flag));
+    expect(lines.slice(at, at + 3).join("\n")).toContain("not with --json");
+  }
+});

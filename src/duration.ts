@@ -6,39 +6,49 @@ const UNIT_MS: Record<string, number> = {
   w: 604_800_000,
 };
 
-const DURATION_RE = /^(\d+)\s*([smhdw])$/;
-const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DURATION_RE = /^(\d+)([smhdw])$/;
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const DATETIME_RE =
+  /^(\d{4})-(\d{2})-(\d{2})[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)?$/;
 const END_OF_DAY_MS = 86_400_000 - 1;
 
-/**
- * Resolve a `--since` / `--until` value to epoch millis. Accepts a relative
- * duration (`7d`, `2h`, `30m`) interpreted as "ago" from `now`, or an absolute
- * date/datetime string parsed by `Date`. A date-only value (`2026-07-15`) is
- * anchored to a UTC day boundary picked by `boundary`: `since` uses 00:00:00Z
- * (include the whole day forward), `until` uses 23:59:59.999Z (include the
- * whole day back). Throws on an unparseable value.
- */
+function isRealDay(year: string, month: string, day: string): boolean {
+  const probe = new Date(0);
+  probe.setUTCFullYear(Number(year), Number(month) - 1, Number(day));
+  return (
+    probe.getUTCFullYear() === Number(year) &&
+    probe.getUTCMonth() === Number(month) - 1 &&
+    probe.getUTCDate() === Number(day)
+  );
+}
+
 export function parseSinceUntil(
   value: string,
   boundary: "since" | "until",
   now: number = Date.now(),
 ): number {
-  const trimmed = value.trim();
-  const rel = DURATION_RE.exec(trimmed);
+  const rel = DURATION_RE.exec(value);
   if (rel) {
-    const amount = Number(rel[1]);
     const unit = rel[2] === undefined ? undefined : UNIT_MS[rel[2]];
-    if (unit !== undefined) return now - amount * unit;
-  }
-  if (DATE_ONLY_RE.test(trimmed)) {
-    const startOfDay = Date.parse(`${trimmed}T00:00:00Z`);
-    if (!Number.isNaN(startOfDay)) {
-      return boundary === "since" ? startOfDay : startOfDay + END_OF_DAY_MS;
+    if (unit !== undefined) {
+      const instant = now - Number(rel[1]) * unit;
+      if (Number.isFinite(instant)) return instant;
     }
   }
-  const abs = Date.parse(trimmed);
-  if (!Number.isNaN(abs)) return abs;
+  const dateOnly = DATE_ONLY_RE.test(value);
+  const parts = DATE_ONLY_RE.exec(value) ?? DATETIME_RE.exec(value);
+  if (parts !== null) {
+    const [, year = "", month = "", day = ""] = parts;
+    if (isRealDay(year, month, day)) {
+      if (dateOnly) {
+        const startOfDay = Date.parse(`${value}T00:00:00Z`);
+        return boundary === "since" ? startOfDay : startOfDay + END_OF_DAY_MS;
+      }
+      const abs = Date.parse(value);
+      if (!Number.isNaN(abs)) return abs;
+    }
+  }
   throw new Error(
-    `invalid time value: "${value}" (use a duration like "7d"/"2h"/"30m" or a date like "2026-06-01")`,
+    `invalid time value: "${value}" (use a duration like "7d"/"2h"/"30m", a date like "2026-06-01", or a datetime like "2026-06-01T12:00:00Z")`,
   );
 }
