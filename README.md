@@ -605,6 +605,30 @@ pnpm run test:coverage   # unit tests with a coverage report
 the others. Coverage thresholds live in `vitest.config.ts` with `autoUpdate`
 enabled: they rise as coverage improves and never fall on their own.
 
+### CI dependency pins
+
+GitHub Actions use full commit SHAs with version comments. CI audits the
+workflows with [zizmor](https://docs.zizmor.sh/), which checks those pins and
+their comments along with other workflow security issues. Run the same audit
+locally, with the zizmor version pinned in `mise.toml` (`mise install`
+provisions it):
+
+```
+GH_TOKEN="$(gh auth token)" zizmor .
+```
+
+The token enables zizmor's online audits, such as detecting a pinned SHA that
+exists only in a fork; without one they are skipped and the result no longer
+matches CI. The audit only reports; it never rewrites files. A finding that is
+intended stays in place with an inline `# zizmor: ignore[<audit>]` comment
+giving the reason.
+
+Renovate keeps these current: it bumps the action SHAs and their version
+comments, and the zizmor version in `mise.toml`. `zizmorcore/zizmor-action`
+accepts only zizmor versions it knows, so a zizmor bump can fail the audit job
+until a newer `zizmor-action` release lands; bump the action's SHA and comment
+together then.
+
 ### Git hooks
 
 `lefthook` installs them on `pnpm install`. `pre-commit` runs eslint and
