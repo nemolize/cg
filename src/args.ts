@@ -20,7 +20,8 @@ Usage:
   cg --json [pattern] [options]
 
 Pattern:
-  Substring match by default.
+  Substring match by default. A pattern starting with - needs -- before it
+  (cg -- -foo).
   -e, --regex          Treat <pattern> as a regular expression
   -F, --fixed          Force literal match (overrides --regex)
   -i, --ignore-case    Case-insensitive match
@@ -49,7 +50,8 @@ Filters:
                                 !-command output or text Claude Code marks as
                                 injected (unmarked and Codex-injected text
                                 still counts)
-  --since <dur|date>            Only turns at/after (e.g. 7d, 2h, 2026-06-01)
+  --since <dur|date>            Only turns at/after (7d, 2h, 2026-06-01, or an
+                                ISO datetime)
   --until <dur|date>            Only turns at/before
   --cwd <substring>             Restrict to sessions whose cwd matches
   --branch <substring>          Restrict by gitBranch
@@ -71,7 +73,8 @@ Context & output:
                        that passes the filters is emitted
   --color <always|never|auto>   Colorize output (default: auto)
   --resume             Print the resume command for the top hit
-                       (\`claude --resume <id>\` / \`codex resume <id>\`)
+                       (\`claude --resume <id>\` / \`codex resume <id>\`);
+                       not with --json
   --print-resume       Print the resume command for every hit
   -h, --help           Show this help
   -V, --version        Show version
@@ -322,6 +325,16 @@ export function parseArgs(
       if (values[resumeFlag] === true) {
         return err(
           `--${resumeFlag} and ${summaryFlag} cannot be combined — a summary prints no hit to resume`,
+        );
+      }
+    }
+  }
+
+  if (values.json === true) {
+    for (const resumeFlag of ["resume", "print-resume"] as const) {
+      if (values[resumeFlag] === true) {
+        return err(
+          `--${resumeFlag} and --json cannot be combined — JSON output carries no resume command`,
         );
       }
     }

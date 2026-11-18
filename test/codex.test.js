@@ -848,3 +848,20 @@ test("a record with neither text nor result is still dropped", async () => {
     },
   );
 });
+
+test("an id that is not UUID-shaped gets no resume command, so a tampered transcript cannot reach the shell", () => {
+  for (const id of [
+    "abc; rm -rf ~",
+    "$(touch pwned)",
+    "-r",
+    "a b",
+    "a\nb",
+    "",
+  ]) {
+    expect(resumeCommandFor("claude", id)).toBe(undefined);
+    expect(resumeCommandFor("codex", id)).toBe(undefined);
+  }
+  expect(
+    resumeCommandFor("claude", "0198f1c2-7b3a-7c1e-9d4e-5a6b7c8d9e0f"),
+  ).toBe("claude --resume 0198f1c2-7b3a-7c1e-9d4e-5a6b7c8d9e0f");
+});

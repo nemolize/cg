@@ -261,14 +261,12 @@ async function main(): Promise<number> {
     }
   }
 
-  if (!opts.json) {
-    if (opts.resume && firstHit !== undefined) {
-      const cmd = resumeCommand(firstHit);
-      if (cmd !== undefined) await writeStdout(`\n${cmd}\n`);
-    }
-    if (opts.printResume && resumeLines.length > 0) {
-      await writeStdout("\n" + resumeLines.join("\n") + "\n");
-    }
+  if (opts.resume && firstHit !== undefined) {
+    const cmd = resumeCommand(firstHit);
+    if (cmd !== undefined) await writeStdout(`\n${cmd}\n`);
+  }
+  if (opts.printResume && resumeLines.length > 0) {
+    await writeStdout("\n" + resumeLines.join("\n") + "\n");
   }
 
   return count > 0 ? 0 : 1;

@@ -38,3 +38,47 @@ test("invalid values throw with a helpful message", () => {
     /invalid time value/,
   );
 });
+
+test.each([
+  "7",
+  "12",
+  "2026",
+  "2026-02-30",
+  "2026-13-01",
+  "2026-06-31",
+  "Jul 4 2026",
+])("%s is rejected, not read as some other date", (value) => {
+  expect(() => parseSinceUntil(value, "since", NOW)).toThrow(
+    /invalid time value/,
+  );
+});
+
+test("a datetime on a day that does not exist is rejected", () => {
+  expect(() => parseSinceUntil("2026-02-30T10:00:00Z", "since", NOW)).toThrow(
+    /invalid time value/,
+  );
+});
+
+test("a leap day is accepted only in a leap year", () => {
+  expect(parseSinceUntil("2028-02-29", "since", NOW)).toBe(
+    Date.parse("2028-02-29T00:00:00Z"),
+  );
+  expect(() => parseSinceUntil("2026-02-29", "since", NOW)).toThrow(
+    /invalid time value/,
+  );
+});
+
+test("a datetime without seconds or with a space separator is accepted", () => {
+  expect(parseSinceUntil("2026-06-01T12:34Z", "since", NOW)).toBe(
+    Date.parse("2026-06-01T12:34:00Z"),
+  );
+  expect(parseSinceUntil("2026-06-01 12:34:56+02:00", "since", NOW)).toBe(
+    Date.parse("2026-06-01T10:34:56Z"),
+  );
+});
+
+test("a duration that overflows to a non-finite instant is rejected", () => {
+  expect(() => parseSinceUntil(`${"9".repeat(400)}d`, "since", NOW)).toThrow(
+    /invalid time value/,
+  );
+});

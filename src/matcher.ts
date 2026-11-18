@@ -67,10 +67,8 @@ export function buildMatcher(opts: Options): Matcher {
       const out: [number, number][] = [];
       re.lastIndex = 0;
       for (const m of line.matchAll(re)) {
-        const start = m.index;
-        // Guard against zero-width matches (e.g. `--regex ''`) looping forever.
-        const end = start + (m[0].length || 1);
-        out.push([start, end]);
+        if (m[0].length === 0) continue;
+        out.push([m.index, m.index + m[0].length]);
       }
       return out;
     },

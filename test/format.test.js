@@ -601,3 +601,49 @@ test("formatSessionLine tolerates a missing session id and cwd", () => {
   );
   expect(out).toContain("?");
 });
+
+const ESC = "\x1b";
+
+test("control characters from a transcript never reach the terminal raw", () => {
+  const h = hit({
+    cwd: `/home/u/${ESC}]0;pwn\x07`,
+    gitBranch: `b${ESC}[2J`,
+    sessionId: `id${ESC}[31m`,
+    textLines: [`${ESC}[31mred match\r\x00\x7f\x9b`, `line${ESC}[0m`],
+  });
+  h.matchedLineIndices = [0];
+  const outputs = [
+    formatHit(h, { ...opts, pattern: "match" }, "/home/u", false),
+    formatHit(h, { ...opts, pattern: "match" }, "/home/u", true),
+    formatDumpBanner(h.turn, "/home/u", false),
+    formatDumpTurn(h, { ...opts, pattern: "match" }, false),
+    formatSessionLine(
+      "claude",
+      h.turn.sessionId,
+      h.turn.cwd,
+      2,
+      "/home/u",
+      false,
+    ),
+  ];
+  const colourCodes = new RegExp(`${ESC}\\[(?:0|1;31|2|36)m`, "g");
+  for (const out of outputs) {
+    expect(out.replace(colourCodes, "")).not.toMatch(/(?![\n])\p{Cc}/u);
+  }
+  expect(outputs[0]).toContain("\u241b[31mred match\u240d\u2400\u2421\ufffd");
+});
+
+test("tab survives, and highlight offsets still line up after replacement", () => {
+  const h = hit({ textLines: [`a\t${ESC}b needle`] });
+  h.matchedLineIndices = [0];
+  const out = formatHit(h, { ...opts, pattern: "needle" }, "/home/u", true);
+  expect(out).toContain("a\t\u241bb \x1b[1;31mneedle\x1b[0m");
+});
+
+test("--json keeps the raw text, escaped by JSON itself", () => {
+  const h = hit({ textLines: [`${ESC}[31mred`] });
+  h.matchedLineIndices = [0];
+  const line = formatHitJson(h, { pattern: "red" }, "/home/u");
+  expect(line).not.toContain(ESC);
+  expect(JSON.parse(line).matchedLines).toEqual([`${ESC}[31mred`]);
+});

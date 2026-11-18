@@ -69,10 +69,14 @@ test("test() is stateless across calls (global flag lastIndex reset)", () => {
   expect(m.test("x")).toBe(true);
 });
 
-test("zero-width regex match does not loop forever", () => {
+test("zero-width regex matches highlight nothing, a real match still does", () => {
   const m = buildMatcher(opts({ pattern: "a*", regex: true }));
-  const ranges = m.ranges("bab");
-  expect(ranges.length > 0).toBeTruthy();
+  expect(m.ranges("bab")).toEqual([[1, 2]]);
+  for (const pattern of ["^", "$", "\\b", "(?=a)"]) {
+    expect(
+      buildMatcher(opts({ pattern, regex: true })).ranges("ab ab"),
+    ).toEqual([]);
+  }
 });
 
 test("lines above the size cap are skipped, not evaluated (ReDoS guard)", () => {
@@ -101,6 +105,5 @@ test("no pattern stays match-everything under --regex", () => {
 test("an empty pattern is still a real pattern, not the no-pattern case", () => {
   const m = buildMatcher(opts({ pattern: "" }));
   expect(m.test("anything")).toBe(true);
-  // A zero-width match reports a range; the no-pattern matcher reports none.
-  expect(m.ranges("ab").length).toBeGreaterThan(0);
+  expect(m.ranges("ab")).toEqual([]);
 });

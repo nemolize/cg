@@ -832,3 +832,14 @@ test("the edit-attempts recipe counts Edit and Write calls per file, not the oth
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test.each(["--resume", "--print-resume"])(
+  "--json with %s is a usage error, not silently ignored",
+  (resume) => {
+    withCorpus((root) => {
+      expect(() =>
+        runCli(["needle", "--root", root, "--json", resume]),
+      ).toThrow(expect.objectContaining({ status: 2 }));
+    });
+  },
+);

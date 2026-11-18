@@ -61,11 +61,15 @@ export function resolveRoots(
   );
 }
 
+/** A transcript supplies the id, and the command is pasted into a shell, so only UUID-shaped ids pass. */
+const SAFE_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+
 /** Printed rather than run, so an absent CLI costs a failed command and never a session reopened under the wrong agent. */
 export function resumeCommandFor(
   source: TranscriptSource,
   sessionId: string,
-): string {
+): string | undefined {
+  if (!SAFE_SESSION_ID.test(sessionId)) return undefined;
   return source === "codex"
     ? `codex resume ${sessionId}`
     : `claude --resume ${sessionId}`;
