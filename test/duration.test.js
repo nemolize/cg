@@ -12,9 +12,14 @@ test("relative durations subtract from now (boundary ignored)", () => {
   expect(parseSinceUntil("1w", "since", NOW)).toBe(NOW - 7 * 86_400_000);
 });
 
-test("whitespace tolerated in relative durations", () => {
-  expect(parseSinceUntil(" 7d ", "since", NOW)).toBe(NOW - 7 * 86_400_000);
-});
+test.each([" 7d ", "7 d", "7\td", "7d\n"])(
+  "whitespace around or inside a duration is rejected: %j",
+  (value) => {
+    expect(() => parseSinceUntil(value, "since", NOW)).toThrow(
+      /invalid time value/,
+    );
+  },
+);
 
 test("date-only values anchor to a UTC day boundary per side", () => {
   const startOfDay = Date.parse("2026-06-01T00:00:00Z");
@@ -74,6 +79,38 @@ test("a datetime without seconds or with a space separator is accepted", () => {
   );
   expect(parseSinceUntil("2026-06-01 12:34:56+02:00", "since", NOW)).toBe(
     Date.parse("2026-06-01T10:34:56Z"),
+  );
+});
+
+test.each([
+  "2026-06-01T12:00+0900",
+  "2026-06-01T12:00:00.5Z",
+  "2026-06-01T12:00:00.1234Z",
+])("%s is outside the datetime forms and is rejected", (value) => {
+  expect(() => parseSinceUntil(value, "since", NOW)).toThrow(
+    /invalid time value/,
+  );
+});
+
+test.each([
+  "2026-06-01 12:00:00+90:00",
+  "2026-06-01T12:00:00+90:00",
+  "2026-06-01 12:00:00+09:60",
+])("an out-of-range offset is rejected on either separator: %s", (value) => {
+  expect(() => parseSinceUntil(value, "since", NOW)).toThrow(
+    /invalid time value/,
+  );
+});
+
+test("the widest legal offset is accepted", () => {
+  expect(parseSinceUntil("2026-06-01 12:00:00+23:59", "since", NOW)).toBe(
+    Date.parse("2026-06-01T12:00:00+23:59"),
+  );
+});
+
+test("a millisecond fraction is accepted", () => {
+  expect(parseSinceUntil("2026-06-01T12:00:00.250Z", "since", NOW)).toBe(
+    Date.parse("2026-06-01T12:00:00.250Z"),
   );
 });
 

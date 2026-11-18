@@ -6,10 +6,10 @@ const UNIT_MS: Record<string, number> = {
   w: 604_800_000,
 };
 
-const DURATION_RE = /^(\d+)\s*([smhdw])$/;
+const DURATION_RE = /^(\d+)([smhdw])$/;
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DATETIME_RE =
-  /^(\d{4})-(\d{2})-(\d{2})[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/;
+  /^(\d{4})-(\d{2})-(\d{2})[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)?$/;
 const END_OF_DAY_MS = 86_400_000 - 1;
 
 function isRealDay(year: string, month: string, day: string): boolean {
@@ -27,8 +27,7 @@ export function parseSinceUntil(
   boundary: "since" | "until",
   now: number = Date.now(),
 ): number {
-  const trimmed = value.trim();
-  const rel = DURATION_RE.exec(trimmed);
+  const rel = DURATION_RE.exec(value);
   if (rel) {
     const unit = rel[2] === undefined ? undefined : UNIT_MS[rel[2]];
     if (unit !== undefined) {
@@ -36,16 +35,16 @@ export function parseSinceUntil(
       if (Number.isFinite(instant)) return instant;
     }
   }
-  const dateOnly = DATE_ONLY_RE.test(trimmed);
-  const parts = DATE_ONLY_RE.exec(trimmed) ?? DATETIME_RE.exec(trimmed);
+  const dateOnly = DATE_ONLY_RE.test(value);
+  const parts = DATE_ONLY_RE.exec(value) ?? DATETIME_RE.exec(value);
   if (parts !== null) {
     const [, year = "", month = "", day = ""] = parts;
     if (isRealDay(year, month, day)) {
       if (dateOnly) {
-        const startOfDay = Date.parse(`${trimmed}T00:00:00Z`);
+        const startOfDay = Date.parse(`${value}T00:00:00Z`);
         return boundary === "since" ? startOfDay : startOfDay + END_OF_DAY_MS;
       }
-      const abs = Date.parse(trimmed);
+      const abs = Date.parse(value);
       if (!Number.isNaN(abs)) return abs;
     }
   }

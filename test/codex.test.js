@@ -849,7 +849,7 @@ test("a record with neither text nor result is still dropped", async () => {
   );
 });
 
-test("an id that is not UUID-shaped gets no resume command, so a tampered transcript cannot reach the shell", () => {
+test("an id that is shell-unsafe or could read as an option gets no resume command, so a tampered transcript cannot reach the shell", () => {
   for (const id of [
     "abc; rm -rf ~",
     "$(touch pwned)",

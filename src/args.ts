@@ -75,7 +75,7 @@ Context & output:
   --resume             Print the resume command for the top hit
                        (\`claude --resume <id>\` / \`codex resume <id>\`);
                        not with --json
-  --print-resume       Print the resume command for every hit
+  --print-resume       Print the resume command for every hit; not with --json
   -h, --help           Show this help
   -V, --version        Show version
 
