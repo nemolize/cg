@@ -48,6 +48,7 @@
     "lint:knip": "knip",
     "lint:prettier": "prettier --check .",
     "lint:typecheck": "run-p --continue-on-error type-check typecheck:node",
+    "lint:zizmor": "zizmor --offline .",
     "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
     "fix": "run-s --continue-on-error fix:eslint fix:prettier",
     "fix:eslint": "eslint . --fix",

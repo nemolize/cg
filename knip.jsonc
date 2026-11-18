@@ -5,6 +5,7 @@
   "project": ["src/**/*.ts", "test/**/*.js"],
   // Only ever invoked as a command, never imported.
   "ignoreDependencies": ["@changesets/cli"],
-  // A system tool the README recipe tests run; CI's runner ships it.
-  "ignoreBinaries": ["jq"],
+  // `jq` is a system tool the README recipe tests run; CI's runner ships it.
+  // `zizmor` comes from mise.toml.
+  "ignoreBinaries": ["jq", "zizmor"],
 }
