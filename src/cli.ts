@@ -115,11 +115,9 @@ async function main(): Promise<number> {
   }
   const opts: Options = { ...requested, roots: readableRoots };
 
-  // Only `--file`, because Codex cannot answer it at all; `--tool` is a real
-  // filter there under a Codex tool name (`exec`), so it needs no notice.
   if (readableRoots.has("codex") && opts.file !== undefined) {
     process.stderr.write(
-      "cg: --file matches no Codex turn, so this searched Claude only\n",
+      "cg: --file matches only Codex apply_patch edits; other Codex tool calls are not searched\n",
     );
   }
 

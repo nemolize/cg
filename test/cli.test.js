@@ -320,9 +320,7 @@ test("the error names what set an unreadable root, and how to fix it", () => {
   expect(err.stderr).toContain("Set --root");
 });
 
-// Silence here reads as "Codex has none of these" when the truth is that the
-// filter cannot ask Codex at all.
-test("a Claude-only filter says so when a Codex root is in scope", () => {
+test("--file says what Codex coverage it has when a Codex root is in scope", () => {
   withCorpus((root) => {
     const codexDir = mkdtempSync(join(tmpdir(), "cg-cli-cx-"));
     try {
@@ -330,15 +328,16 @@ test("a Claude-only filter says so when a Codex root is in scope", () => {
         CG_ROOT: root,
         CG_CODEX_ROOT: codexDir,
       });
-      expect(run.stderr).toContain("--file");
-      expect(run.stderr).toContain("Claude only");
+      expect(run.stderr).toContain(
+        "--file matches only Codex apply_patch edits",
+      );
     } finally {
       rmSync(codexDir, { recursive: true, force: true });
     }
   });
 });
 
-test("the Claude-only notice names --file but not --branch, which Codex answers", () => {
+test("the --file notice names --file but not --branch, which Codex answers", () => {
   withCorpus((root) => {
     const codexDir = mkdtempSync(join(tmpdir(), "cg-cli-cx-"));
     try {
@@ -347,7 +346,9 @@ test("the Claude-only notice names --file but not --branch, which Codex answers"
         ["needle", "--file", "src", "--branch", "main", "-c"],
         env,
       );
-      expect(both.stderr).toContain("--file matches no Codex turn");
+      expect(both.stderr).toContain(
+        "--file matches only Codex apply_patch edits",
+      );
       expect(both.stderr).not.toContain("--branch");
       const branchOnly = spawnCli(["needle", "--branch", "main", "-c"], env);
       expect(branchOnly.stderr).toBe("");
@@ -415,6 +416,58 @@ test("--branch selects a Codex session on the branch it started on", () => {
           .map((l) => JSON.parse(l).sessionId),
       ).toEqual(["on-feat"]);
     }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--file selects a Codex turn that edits the file through apply_patch", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-cx-"));
+  try {
+    const patch = (path) =>
+      `await tools.apply_patch(${JSON.stringify(`*** Begin Patch\n*** Update File: ${path}\n*** End Patch`)})`;
+    const call = (input) =>
+      JSON.stringify({
+        timestamp: "2026-07-13T00:00:00.000Z",
+        type: "response_item",
+        payload: { type: "custom_tool_call", name: "exec", input },
+      });
+    const meta = JSON.stringify({
+      timestamp: "2026-07-13T00:00:00.000Z",
+      type: "session_meta",
+      payload: { id: "s1", cwd: "/p" },
+    });
+    writeFileSync(
+      join(dir, "rollout-2026-07-13T00-00-00-s1.jsonl"),
+      [meta, call(patch("/p/src/a.ts"))].join("\n"),
+    );
+    writeFileSync(
+      join(dir, "rollout-2026-07-13T00-00-01-s2.jsonl"),
+      [
+        meta.replace("s1", "s2"),
+        call('tools.exec_command({cmd:"cat /p/src/a.ts"})'),
+      ].join("\n"),
+    );
+    const emptyClaude = join(dir, "claude");
+    mkdirSync(emptyClaude);
+    const run = spawnCli([
+      "--source",
+      "codex",
+      "--root",
+      emptyClaude,
+      "--codex-root",
+      dir,
+      "--file",
+      "src/a.ts",
+      "--json",
+    ]);
+    const hits = run.stdout
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+    expect(hits.map((h) => h.sessionId)).toEqual(["s1"]);
+    expect(hits[0].toolCalls[0].paths).toEqual(["/p/src/a.ts"]);
+    expect(run.stderr.match(/--file matches only/g)).toHaveLength(1);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
