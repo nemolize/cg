@@ -271,18 +271,12 @@ test("a custom tool call keeps even JSON-shaped input as its string", async () =
 
 test("only an exec custom tool call reads apply_patch paths from its source", async () => {
   const source = `await tools.apply_patch(${JSON.stringify("*** Begin Patch\n*** Update File: /a/b.ts\n*** End Patch")})`;
-  const record = (payload) =>
-    JSON.stringify({
-      timestamp: "2026-09-14T04:01:40.000Z",
-      type: "response_item",
-      payload,
-    });
   await withCodexFile(
     [
       meta(),
-      record({ type: "custom_tool_call", name: "exec", input: source }),
-      record({ type: "custom_tool_call", name: "other", input: source }),
-      record({ type: "function_call", name: "exec", arguments: source }),
+      item({ type: "custom_tool_call", name: "exec", input: source }),
+      item({ type: "custom_tool_call", name: "other", input: source }),
+      item({ type: "function_call", name: "exec", arguments: source }),
     ],
     (turns) => {
       expect(turns.flatMap((t) => t.toolCalls.map((c) => c.paths))).toEqual([

@@ -211,3 +211,15 @@ test("a blank Move to destination is dropped", () => {
   );
   expect(applyPatchPaths(src)).toEqual(["a.ts"]);
 });
+
+test("trailing whitespace on a header path is not part of the path", () => {
+  const src = call(
+    patch("*** Update File: a.ts  ", "*** Move to: b.ts ", "*** End Patch"),
+  );
+  expect(applyPatchPaths(src)).toEqual(["a.ts", "b.ts"]);
+});
+
+test("a call that follows a statement on the same line is not read", () => {
+  const src = `const x = 1; ${call(patch("*** Update File: a.ts", "*** End Patch"))}`;
+  expect(applyPatchPaths(src)).toEqual([]);
+});

@@ -472,7 +472,7 @@ whether one landed is in the paired result (`toolResults`, see
 others, such as a `Read` of another file. The `select` repeats the filter on
 each call, so only the named ones are counted; `jq` compares names exactly, where
 `--tool` ignores case. Add `MultiEdit` or `NotebookEdit` to both lists to count
-them. `--source claude` is there because a Codex call records a path only for `apply_patch`.
+them. `--source claude` is there because Codex records edits as `exec` calls rather than `Edit` or `Write`.
 
 ## Codex support
 
@@ -493,18 +493,22 @@ Three filters read something Codex records differently, or not at all:
   passes a tool's arguments as one string — JavaScript source for `exec`, a JSON
   blob for a function call — and no field holds a path. The one reliable source
   is the `*** Add File:` / `*** Update File:` / `*** Delete File:` headers (and
-  the `*** Move to:` that follows an `Update File`) of a top-level
-  `await tools.apply_patch("…")` call in an `exec` source. A shell command that
+  the `*** Move to:` that follows an `Update File`) of an
+  `await tools.apply_patch("…")` call in an `exec` source that starts a line, so
+  one placed after a `;` on the same line is not read. A shell command that
   merely mentions a filename never matches, since guessing a path would attribute
   edits to sessions that only read the file; grep for the path instead. As for
   Claude, the match is on the attempt, so an unfinished or failed patch still
-  counts. Calls built from a template literal, a variable or an expression, and
-  string escapes JSON lacks (`\'`, `\x41`, `\0`), are not read. A run that pairs
+  counts. A call built from a template literal, a variable or an expression is
+  not read; a string concatenation counts only up to the headers its first
+  literal finishes. String escapes JSON lacks (`\'`, `\x41`, `\0`) are not read
+  either. A line starting with such a call inside a template literal or a block
+  comment is read as one, since the match is on lines, not on parsed JavaScript. A run that pairs
   `--file` with a Codex root says on stderr that Codex is covered only this
   way, so an empty result is never mistaken for "Codex has none either".
 - **`--tool` matches Codex's own tool names** (`exec`, `send_message`,
-  `web_search_call`, …), not Claude's `Edit` / `Write` / `Bash`. Unlike
-  `--file` it still works on Codex — under a Codex name — so a name list
+  `web_search_call`, …), not Claude's `Edit` / `Write` / `Bash`. It works on
+  Codex under a Codex name, so a name list
   written for one source simply selects nothing in the other, with no notice.
 - **`--branch` is per turn for Claude, per session for Codex.** Codex records the
   branch once, on the rollout's `session_meta`, so every turn of a Codex session

@@ -31,22 +31,14 @@ function headerPaths(patch: string, concatenated: boolean): string[] {
   if (lines[0] !== BEGIN) return [];
 
   const out: string[] = [];
-  let skip = false;
   for (const [i, line] of lines.entries()) {
     if (line === END) break;
-    if (skip) {
-      skip = false;
-      continue;
-    }
-    const header = FILE_HEADER.exec(line);
-    if (header?.[1] === undefined || header[1].trim() === "") continue;
-    out.push(header[1]);
+    const path = FILE_HEADER.exec(line)?.[1]?.trimEnd();
+    if (path === undefined || path === "") continue;
+    out.push(path);
     if (line.startsWith("*** Update File:")) {
-      const dest = MOVE_HEADER.exec(lines[i + 1] ?? "")?.[1];
-      if (dest !== undefined && dest.trim() !== "") {
-        out.push(dest);
-        skip = true;
-      }
+      const dest = MOVE_HEADER.exec(lines[i + 1] ?? "")?.[1]?.trimEnd();
+      if (dest !== undefined && dest !== "") out.push(dest);
     }
   }
   return out;

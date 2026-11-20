@@ -143,6 +143,7 @@ function readToolCall(
 
   const textLines = [...header, ...body];
   if (textLines.length === 0) return undefined;
+  // Codex records `apply_patch` edits only inside `exec` source.
   const paths =
     payload["type"] === "custom_tool_call" &&
     name === "exec" &&
