@@ -53,6 +53,27 @@ function readRole(
   return undefined;
 }
 
+/** An exact list, not "anything but `user.text`": hiding a prompt costs more than showing one. */
+const INJECTED_USER_KINDS: ReadonlySet<string> = new Set([
+  "agents_md.instructions",
+  "environments.environment_context",
+  "goal.internal_context",
+  "daemon_recovery.internal_context",
+]);
+
+function isInjectedUserMessage(payload: Record<string, unknown>): boolean {
+  const content = payload["content"];
+  const metadata = payload["internal_chat_message_metadata_passthrough"];
+  if (!Array.isArray(content) || !isRecord(metadata)) return false;
+  const kinds = metadata["content_item_kinds"];
+  return (
+    Array.isArray(kinds) &&
+    kinds.length > 0 &&
+    kinds.length === content.length &&
+    kinds.every((k) => typeof k === "string" && INJECTED_USER_KINDS.has(k))
+  );
+}
+
 function collectMessageText(content: unknown): string[] {
   if (typeof content === "string")
     return content === "" ? [] : content.split("\n");
@@ -223,7 +244,9 @@ export function parseCodexLine(
       const kind = readRole(str(payload["role"]));
       if (kind === undefined) return undefined;
       role = kind.role;
-      isMeta = kind.isMeta;
+      isMeta =
+        kind.isMeta ||
+        (payload["role"] === "user" && isInjectedUserMessage(payload));
       textLines = collectMessageText(payload["content"]);
       contentKind = "text";
       break;

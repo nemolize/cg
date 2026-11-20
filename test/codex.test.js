@@ -109,6 +109,81 @@ test("developer turns are meta, so they stay out of a default search", async () 
   );
 });
 
+function kindsMessage(kinds, texts) {
+  return JSON.stringify({
+    type: "response_item",
+    payload: {
+      type: "message",
+      role: "user",
+      content: texts.map((text) => ({ type: "input_text", text })),
+      internal_chat_message_metadata_passthrough: { content_item_kinds: kinds },
+    },
+  });
+}
+
+test("user messages whose items are all known injected kinds are meta", async () => {
+  await withCodexFile(
+    [
+      meta(),
+      kindsMessage(["agents_md.instructions"], ["# AGENTS.md instructions"]),
+      kindsMessage(
+        ["agents_md.instructions", "environments.environment_context"],
+        ["a", "b"],
+      ),
+      kindsMessage(["goal.internal_context"], ["goal"]),
+      kindsMessage(["daemon_recovery.internal_context"], ["restart"]),
+    ],
+    (turns) => {
+      expect(turns.map((t) => t.isMeta)).toEqual([true, true, true, true]);
+      expect(turns.every((t) => t.role === "user")).toBe(true);
+    },
+  );
+});
+
+test("a user message is not meta unless every item is a known injected kind", async () => {
+  const bare = JSON.stringify({
+    type: "response_item",
+    payload: {
+      type: "message",
+      role: "user",
+      content: [{ type: "input_text", text: "no field" }],
+    },
+  });
+  await withCodexFile(
+    [
+      meta(),
+      kindsMessage(["user.text"], ["typed"]),
+      kindsMessage(["shell.user_command"], ["<user_shell_command>"]),
+      kindsMessage(["future.thing"], ["unknown kind"]),
+      kindsMessage(["agents_md.instructions"], ["a", "b"]),
+      kindsMessage(["agents_md.instructions", "user.text"], ["a", "b"]),
+      kindsMessage([], ["empty"]),
+      kindsMessage("agents_md.instructions", ["not an array"]),
+      kindsMessage([7], ["not a string"]),
+      bare,
+    ],
+    (turns) => {
+      expect(turns).toHaveLength(9);
+      expect(turns.map((t) => t.isMeta)).toEqual(Array(9).fill(false));
+    },
+  );
+});
+
+test("typed text that begins with an injected wrapper is still shown", async () => {
+  await withCodexFile(
+    [
+      meta(),
+      kindsMessage(
+        ["user.text"],
+        ["# AGENTS.md instructions for /x\n\n<INSTRUCTIONS>"],
+      ),
+    ],
+    (turns) => {
+      expect(turns[0].isMeta).toBe(false);
+    },
+  );
+});
+
 test("a tool call contributes its name and arguments as searchable lines", async () => {
   await withCodexFile(
     [

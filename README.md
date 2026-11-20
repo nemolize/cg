@@ -251,7 +251,7 @@ tool use]`; a string that is one `<local-command-stdout>` or
   around it is kept;
 - other Claude lines without an origin field are not detected: older
   transcripts;
-- Codex's injected context is likewise not detected.
+- Codex's injected context is dropped through `isMeta` (see [Codex support](#codex-support)); Codex's auto-review prompts and `!` shell commands are not.
 
 `--role human` drops `isMeta` turns even with `--include-meta`.
 
@@ -502,9 +502,17 @@ Three filters read something Codex records differently, or not at all:
   that is settled the field is left unset, and a `--branch` run says on stderr
   that it searched Claude only, the same way `--file` does.
 
-`--include-meta` reaches Codex's `developer` turns, which carry injected
-instructions rather than anything either party said — the role Claude's `isMeta`
-turns play.
+`--include-meta` reaches Codex's injected turns, which carry instructions or
+context rather than anything either party said — the role Claude's `isMeta` turns
+play. Two kinds: `developer` messages, and `user` messages whose every item
+Codex's own `content_item_kinds` field labels `agents_md.instructions`,
+`environments.environment_context`, `goal.internal_context` or
+`daemon_recovery.internal_context` (the `AGENTS.md` body and the like). The list
+is exact, so a message with any other kind, no such field or a mismatched item
+count stays a human turn, and a kind Codex adds later shows until it is listed.
+`!` shell commands (`shell.user_command`) and the `The following is the Codex
+agent history…` prompts of Codex's auto-review sessions, which Codex records as
+plain typed text, are not detected.
 
 A Codex tool call's input is rendered like a Claude `tool_use`: a `⚙ <name>`
 line, then one `key: value` line per key, so any field is searchable and the
