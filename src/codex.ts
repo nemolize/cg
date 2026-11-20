@@ -12,6 +12,7 @@ export interface CodexFileState {
   cwd?: string | undefined;
   /** Branch at session start: Codex records it on `session_meta` only. */
   gitBranch?: string | undefined;
+  branchRead?: boolean | undefined;
   forkedFromId?: string | undefined;
   isSubagent: boolean;
 }
@@ -25,8 +26,8 @@ function str(value: unknown): string | undefined {
 }
 
 /**
- * Only the first names the thread, because a rollout carries its parent's or
- * ancestors' meta below its own and last-wins hid the file's own id.
+ * Only the first names the thread and its branch: a rollout carries its
+ * ancestors' meta below its own, and last-wins hid the file's own id.
  */
 function applySessionMeta(
   payload: Record<string, unknown>,
@@ -34,14 +35,17 @@ function applySessionMeta(
 ): void {
   const cwd = str(payload["cwd"]);
   if (cwd !== undefined) state.cwd = cwd;
+  if (state.branchRead !== true) {
+    const git = payload["git"];
+    state.gitBranch = isRecord(git) ? str(git["branch"]) : undefined;
+    state.branchRead = true;
+  }
   if (state.sessionId !== undefined) return;
 
   const threadSource = str(payload["thread_source"]);
   state.sessionId = str(payload["session_id"]) ?? str(payload["id"]);
   state.threadId = str(payload["id"]);
   state.forkedFromId = str(payload["forked_from_id"]);
-  const git = payload["git"];
-  state.gitBranch = isRecord(git) ? str(git["branch"]) : undefined;
   state.isSubagent = threadSource !== undefined && threadSource !== "user";
 }
 

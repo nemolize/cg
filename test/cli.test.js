@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -390,24 +391,30 @@ test("--branch selects a Codex session on the branch it started on", () => {
       join(dir, "rollout-2026-07-13T00-00-00-no-git.jsonl"),
       rollout("no-git", {}),
     );
-    const run = spawnCli([
-      "needle",
-      "--source",
-      "codex",
-      "--codex-root",
-      dir,
-      "--branch",
-      "feat/x",
-      "-l",
-      "--json",
-    ]);
-    expect(run.stderr).toBe("");
-    expect(
-      run.stdout
-        .trim()
-        .split("\n")
-        .map((l) => JSON.parse(l).sessionId),
-    ).toEqual(["on-feat"]);
+    const emptyClaude = join(dir, "claude");
+    mkdirSync(emptyClaude);
+    for (const source of ["codex", "both"]) {
+      const run = spawnCli([
+        "needle",
+        "--source",
+        source,
+        "--root",
+        emptyClaude,
+        "--codex-root",
+        dir,
+        "--branch",
+        "feat/x",
+        "-l",
+        "--json",
+      ]);
+      expect(run.stderr).toBe("");
+      expect(
+        run.stdout
+          .trim()
+          .split("\n")
+          .map((l) => JSON.parse(l).sessionId),
+      ).toEqual(["on-feat"]);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

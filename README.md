@@ -496,8 +496,8 @@ Three filters read something Codex records differently, or not at all:
   that pairs it with a Codex root says on stderr that it searched Claude only,
   so an empty result is never mistaken for "Codex has none either".
 - **`--tool` matches Codex's own tool names** (`exec`, `send_message`,
-  `web_search_call`, …), not Claude's `Edit` / `Write` / `Bash`. Unlike the
-  other two it still works on Codex — under a Codex name — so a name list
+  `web_search_call`, …), not Claude's `Edit` / `Write` / `Bash`. Unlike
+  `--file` it still works on Codex — under a Codex name — so a name list
   written for one source simply selects nothing in the other, with no notice.
 - **`--branch` is per turn for Claude, per session for Codex.** Codex records the
   branch once, on the rollout's `session_meta`, so every turn of a Codex session

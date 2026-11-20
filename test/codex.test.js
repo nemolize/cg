@@ -831,6 +831,19 @@ test("a Codex turn carries the branch its session started on, from the file's ow
   );
 });
 
+test("a first session_meta with no id still fixes the branch, so a parent's later meta cannot replace it", async () => {
+  await withCodexFile(
+    [
+      meta({ session_id: undefined, id: undefined, git: { branch: "own" } }),
+      meta({ git: { branch: "parent" } }),
+      message("user", "x"),
+    ],
+    (turns) => {
+      expect(turns[0].gitBranch).toBe("own");
+    },
+  );
+});
+
 test.each([
   ["no git object", {}],
   ["no branch in git", { git: { commit_hash: "abc" } }],
