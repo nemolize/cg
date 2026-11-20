@@ -238,6 +238,31 @@ test("Codex skips a repeat of the previous event and a null info; the rest sum t
   });
 });
 
+test("Codex usage records carry the session-start branch, and --branch filters them", async () => {
+  await withDirs(async (dirs) => {
+    await write(dirs.codex, "rollout-a.jsonl", [
+      meta({ id: "a", git: { branch: "feat/x" } }),
+      call(10, 10),
+    ]);
+    await write(dirs.codex, "rollout-b.jsonl", [
+      meta({ id: "b", git: { branch: "main" } }),
+      call(20, 20),
+    ]);
+    await write(dirs.codex, "rollout-c.jsonl", [
+      meta({ id: "c" }),
+      call(30, 30),
+    ]);
+    const all = await scan(dirs, ["--source", "codex"]);
+    expect(all.map((r) => r.gitBranch).sort()).toStrictEqual([
+      "feat/x",
+      "main",
+      undefined,
+    ]);
+    const onMain = await scan(dirs, ["--source", "codex", "--branch", "main"]);
+    expect(onMain.map((r) => r.usage.totalTokens)).toStrictEqual([20]);
+  });
+});
+
 test("an event after a compaction records only totalTokens", async () => {
   await withDirs(async (dirs) => {
     await write(dirs.codex, "rollout-a.jsonl", [

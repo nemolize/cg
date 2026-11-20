@@ -87,7 +87,9 @@ $ npx @nemolize/cg "auth flow"
   datetime (`2026-06-01T12:00:00Z`). Anything else, a bare `7` or a day that does
   not exist (`2026-02-30`) included, is a usage error.
 - `--cwd <substring>` — restrict to sessions whose working directory matches.
-- `--branch <substring>` — restrict by the git branch at session start.
+- `--branch <substring>` — restrict by the git branch. A Claude turn matches on
+  the branch checked out at that turn; a Codex turn matches on the branch its
+  session started on, the only one Codex records.
 - `--tool <name[,name...]>` — restrict to turns that called one of these tools,
   matched case-insensitively. Repeatable, so `--tool Edit --tool Write` and
   `--tool Edit,Write` are the same request.
@@ -494,15 +496,14 @@ Three filters read something Codex records differently, or not at all:
   that pairs it with a Codex root says on stderr that it searched Claude only,
   so an empty result is never mistaken for "Codex has none either".
 - **`--tool` matches Codex's own tool names** (`exec`, `send_message`,
-  `web_search_call`, …), not Claude's `Edit` / `Write` / `Bash`. Unlike the
-  other two it still works on Codex — under a Codex name — so a name list
+  `web_search_call`, …), not Claude's `Edit` / `Write` / `Bash`. Unlike
+  `--file` it still works on Codex — under a Codex name — so a name list
   written for one source simply selects nothing in the other, with no notice.
-- **`--branch` never matches a Codex turn** — not yet. Codex does record the
-  branch on a rollout's `session_meta` (absent only outside a repo), but only
-  there: it is the branch at session start rather than Claude's per-turn value,
-  so reading it is a different filter than the one `--branch` documents. Until
-  that is settled the field is left unset, and a `--branch` run says on stderr
-  that it searched Claude only, the same way `--file` does.
+- **`--branch` is per turn for Claude, per session for Codex.** Codex records the
+  branch once, on the rollout's `session_meta`, so every turn of a Codex session
+  carries the branch it started on: a session that began on `main` and moved to
+  `feat/x` still matches `--branch main` only. A session outside a git
+  repository has no branch and never matches.
 
 `--include-meta` reaches Codex's injected turns, which carry instructions or
 context rather than anything either party said — the role Claude's `isMeta` turns

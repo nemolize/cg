@@ -813,6 +813,49 @@ test("a replayed ancestor cannot flip the thread to subagent", async () => {
   );
 });
 
+test("a Codex turn carries the branch its session started on, from the file's own session_meta", async () => {
+  await withCodexFile(
+    [
+      meta({ git: { branch: "feat/own" } }),
+      message("user", "first"),
+      meta({
+        session_id: "ancestor-1",
+        id: "ancestor-1",
+        git: { branch: "main" },
+      }),
+      message("user", "replayed"),
+    ],
+    (turns) => {
+      expect(turns.map((t) => t.gitBranch)).toEqual(["feat/own", "feat/own"]);
+    },
+  );
+});
+
+test("a first session_meta with no id still fixes the branch, so a parent's later meta cannot replace it", async () => {
+  await withCodexFile(
+    [
+      meta({ session_id: undefined, id: undefined, git: { branch: "own" } }),
+      meta({ git: { branch: "parent" } }),
+      message("user", "x"),
+    ],
+    (turns) => {
+      expect(turns[0].gitBranch).toBe("own");
+    },
+  );
+});
+
+test.each([
+  ["no git object", {}],
+  ["no branch in git", { git: { commit_hash: "abc" } }],
+  ["a non-string branch", { git: { branch: 7 } }],
+  ["an empty branch", { git: { branch: "" } }],
+  ["a non-object git", { git: "main" }],
+])("%s leaves gitBranch undefined", async (_name, over) => {
+  await withCodexFile([meta(over), message("user", "x")], (turns) => {
+    expect(turns[0].gitBranch).toBeUndefined();
+  });
+});
+
 test("resume wording follows the source, so a copied command reopens the right agent", () => {
   expect(resumeCommandFor("claude", "abc")).toBe("claude --resume abc");
   expect(resumeCommandFor("codex", "abc")).toBe("codex resume abc");

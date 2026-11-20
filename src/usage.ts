@@ -199,7 +199,7 @@ export function parseCodexUsageLine(
       cwd: state.cwd,
       ...timestampFields(parsed["timestamp"]),
       sessionId: state.sessionId,
-      gitBranch: undefined,
+      gitBranch: state.gitBranch,
       isSidechain: state.isSubagent,
       agentId: state.isSubagent ? state.threadId : undefined,
       usage: compact({
