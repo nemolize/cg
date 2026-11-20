@@ -337,6 +337,82 @@ test("a Claude-only filter says so when a Codex root is in scope", () => {
   });
 });
 
+test("the Claude-only notice names --file but not --branch, which Codex answers", () => {
+  withCorpus((root) => {
+    const codexDir = mkdtempSync(join(tmpdir(), "cg-cli-cx-"));
+    try {
+      const env = { CG_ROOT: root, CG_CODEX_ROOT: codexDir };
+      const both = spawnCli(
+        ["needle", "--file", "src", "--branch", "main", "-c"],
+        env,
+      );
+      expect(both.stderr).toContain("--file matches no Codex turn");
+      expect(both.stderr).not.toContain("--branch");
+      const branchOnly = spawnCli(["needle", "--branch", "main", "-c"], env);
+      expect(branchOnly.stderr).toBe("");
+    } finally {
+      rmSync(codexDir, { recursive: true, force: true });
+    }
+  });
+});
+
+test("--branch selects a Codex session on the branch it started on", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-cli-codex-branch-"));
+  try {
+    const rollout = (id, git) =>
+      [
+        JSON.stringify({
+          timestamp: "2026-07-13T00:00:00Z",
+          type: "session_meta",
+          payload: {
+            session_id: id,
+            id,
+            cwd: "/cx-proj",
+            thread_source: "user",
+            ...git,
+          },
+        }),
+        JSON.stringify({
+          timestamp: "2026-07-13T00:01:00Z",
+          type: "response_item",
+          payload: {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: "a needle here" }],
+          },
+        }),
+      ].join("\n");
+    writeFileSync(
+      join(dir, "rollout-2026-07-13T00-00-00-on-feat.jsonl"),
+      rollout("on-feat", { git: { branch: "feat/x" } }),
+    );
+    writeFileSync(
+      join(dir, "rollout-2026-07-13T00-00-00-no-git.jsonl"),
+      rollout("no-git", {}),
+    );
+    const run = spawnCli([
+      "needle",
+      "--source",
+      "codex",
+      "--codex-root",
+      dir,
+      "--branch",
+      "feat/x",
+      "-l",
+      "--json",
+    ]);
+    expect(run.stderr).toBe("");
+    expect(
+      run.stdout
+        .trim()
+        .split("\n")
+        .map((l) => JSON.parse(l).sessionId),
+    ).toEqual(["on-feat"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("the notice stays quiet when no Codex root is in scope", () => {
   withCorpus((root) => {
     const run = spawnCli([

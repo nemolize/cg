@@ -115,20 +115,12 @@ async function main(): Promise<number> {
   }
   const opts: Options = { ...requested, roots: readableRoots };
 
-  // Only these two, because Codex cannot answer them at all; `--tool` is a real
+  // Only `--file`, because Codex cannot answer it at all; `--tool` is a real
   // filter there under a Codex tool name (`exec`), so it needs no notice.
-  if (readableRoots.has("codex")) {
-    const claudeOnly = [
-      opts.file === undefined ? undefined : "--file",
-      opts.branch === undefined ? undefined : "--branch",
-    ].filter((f) => f !== undefined);
-    if (claudeOnly.length > 0) {
-      const verb = claudeOnly.length > 1 ? "match" : "matches";
-      process.stderr.write(
-        `cg: ${claudeOnly.join(" and ")} ${verb} no Codex turn, so this ` +
-          `searched Claude only\n`,
-      );
-    }
+  if (readableRoots.has("codex") && opts.file !== undefined) {
+    process.stderr.write(
+      "cg: --file matches no Codex turn, so this searched Claude only\n",
+    );
   }
 
   if (opts.usage) {

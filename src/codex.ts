@@ -10,6 +10,8 @@ export interface CodexFileState {
   sessionId?: string | undefined;
   threadId?: string | undefined;
   cwd?: string | undefined;
+  /** Branch at session start: Codex records it on `session_meta` only. */
+  gitBranch?: string | undefined;
   forkedFromId?: string | undefined;
   isSubagent: boolean;
 }
@@ -38,6 +40,8 @@ function applySessionMeta(
   state.sessionId = str(payload["session_id"]) ?? str(payload["id"]);
   state.threadId = str(payload["id"]);
   state.forkedFromId = str(payload["forked_from_id"]);
+  const git = payload["git"];
+  state.gitBranch = isRecord(git) ? str(git["branch"]) : undefined;
   state.isSubagent = threadSource !== undefined && threadSource !== "user";
 }
 
@@ -316,7 +320,7 @@ export function parseCodexLine(
     timestamp,
     timestampMs: Number.isNaN(parsedTs) ? undefined : parsedTs,
     cwd: state.cwd,
-    gitBranch: undefined,
+    gitBranch: state.gitBranch,
     isMeta,
     isSidechain: state.isSubagent,
     agentId: state.isSubagent ? state.threadId : undefined,
