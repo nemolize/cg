@@ -64,7 +64,7 @@ jobs:
       # Reads MISE_NODE_VERSION above into both cache keys, so the matrix legs
       # don't share the toolchain or the pnpm store.
       - name: Set up the toolchain and install dependencies
-        uses: nemolize/actions/setup@a78b0df6a8df72fe3a12a16e1c608d27ff490950 # v1.4.1
+        uses: nemolize/actions/setup@5d31663b9013a671ff8fe8b84900a88b9878f0c1 # v1.5.0
 
       - name: Lint
         run: pnpm run lint
@@ -105,7 +105,7 @@ jobs:
 
       - if: ${{ !cancelled() && matrix.node-version == '24' && github.event_name == 'pull_request' && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
         name: Write the coverage report into the PR description
-        uses: nemolize/actions/upsert@a78b0df6a8df72fe3a12a16e1c608d27ff490950 # v1.4.1
+        uses: nemolize/actions/upsert@5d31663b9013a671ff8fe8b84900a88b9878f0c1 # v1.5.0
         with:
           marker: coverage
           body: ${{ steps.table.outputs.markdown }}
