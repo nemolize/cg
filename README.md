@@ -288,9 +288,9 @@ was attempted, and whether it landed lives in the paired result. An edit that
 failed on a stale `old_string` still matches — which is usually what you want,
 since the attempt is itself evidence that session was working on the file.
 
-`--file` and `--tool` as described here are Claude-only: a Codex tool call
-records no path field, so `--file` never selects one and `--tool` takes Codex's
-own tool names — see [Codex support](#codex-support).
+`--file` and `--tool` as described here are Claude's: on Codex, `--file` selects
+only `apply_patch` edits and `--tool` takes Codex's own tool names — see
+[Codex support](#codex-support).
 
 `--json` carries a `toolCalls` array (`{id, name, paths, input}`) on any hit that
 made one, so the attribution is machine-readable without re-parsing the rendered
@@ -472,7 +472,7 @@ whether one landed is in the paired result (`toolResults`, see
 others, such as a `Read` of another file. The `select` repeats the filter on
 each call, so only the named ones are counted; `jq` compares names exactly, where
 `--tool` ignores case. Add `MultiEdit` or `NotebookEdit` to both lists to count
-them. `--source claude` is there because a Codex call records no path.
+them. `--source claude` is there because a Codex call records a path only for `apply_patch`.
 
 ## Codex support
 
@@ -489,12 +489,19 @@ JSON escaping or quoted object keys.
 
 Three filters read something Codex records differently, or not at all:
 
-- **`--file` never matches a Codex turn.** Codex passes a tool's arguments as one
-  string — JavaScript source for `exec`, a JSON blob for a function call — and
-  even parsed, no field is known to hold a path, so guessing one would attribute
-  edits to sessions that merely mentioned a filename. Grep for the path instead. A run
-  that pairs it with a Codex root says on stderr that it searched Claude only,
-  so an empty result is never mistaken for "Codex has none either".
+- **`--file` matches a Codex turn only through an `apply_patch` edit.** Codex
+  passes a tool's arguments as one string — JavaScript source for `exec`, a JSON
+  blob for a function call — and no field holds a path. The one reliable source
+  is the `*** Add File:` / `*** Update File:` / `*** Delete File:` headers (and
+  the `*** Move to:` that follows an `Update File`) of a top-level
+  `await tools.apply_patch("…")` call in an `exec` source. A shell command that
+  merely mentions a filename never matches, since guessing a path would attribute
+  edits to sessions that only read the file; grep for the path instead. As for
+  Claude, the match is on the attempt, so an unfinished or failed patch still
+  counts. Calls built from a template literal, a variable or an expression, and
+  string escapes JSON lacks (`\'`, `\x41`, `\0`), are not read. A run that pairs
+  `--file` with a Codex root says on stderr that Codex is covered only this
+  way, so an empty result is never mistaken for "Codex has none either".
 - **`--tool` matches Codex's own tool names** (`exec`, `send_message`,
   `web_search_call`, …), not Claude's `Edit` / `Write` / `Bash`. Unlike
   `--file` it still works on Codex — under a Codex name — so a name list

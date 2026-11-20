@@ -1,3 +1,4 @@
+import { applyPatchPaths } from "./applyPatch.js";
 import { isRecord } from "./guards.js";
 import { renderToolInput, renderValue, TOOL_MARK } from "./textExtract.js";
 import type { ContentKind, ToolCall, ToolResult, Turn } from "./types.js";
@@ -107,20 +108,17 @@ function withInput(
   payload: Record<string, unknown>,
   name: string,
   input: unknown,
+  paths: string[] = [],
 ): ToolCall {
   const id = str(payload["call_id"]);
   return {
     ...(id !== undefined ? { id } : {}),
     name,
-    paths: [],
+    paths,
     ...(input != null ? { input } : {}),
   };
 }
 
-/**
- * `paths` stays empty because no argument field is known to hold a path, even
- * once a `function_call`'s JSON is parsed.
- */
 function readToolCall(
   payload: Record<string, unknown>,
 ): { toolCall: ToolCall; textLines: string[] } | undefined {
@@ -145,7 +143,13 @@ function readToolCall(
 
   const textLines = [...header, ...body];
   if (textLines.length === 0) return undefined;
-  return { toolCall: withInput(payload, name, input), textLines };
+  const paths =
+    payload["type"] === "custom_tool_call" &&
+    name === "exec" &&
+    typeof input === "string"
+      ? applyPatchPaths(input)
+      : [];
+  return { toolCall: withInput(payload, name, input, paths), textLines };
 }
 
 function readSearchCall(
