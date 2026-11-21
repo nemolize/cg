@@ -1,5 +1,15 @@
 # @nemolize/cc-grep
 
+## 0.11.0
+
+### Minor Changes
+
+- [#249](https://github.com/nemolize/cg/pull/249) [`df1b50a`](https://github.com/nemolize/cg/commit/df1b50a483e36336a4efa5aa138a2c2fa5c46646) - `--file` now selects Codex turns that edit the file through `apply_patch`, read from the patch headers of a top-level `await tools.apply_patch("…")` call in an `exec` source. Other Codex tool calls still match no path, and the stderr notice now says so.
+
+- [#245](https://github.com/nemolize/cg/pull/245) [`a63b0c3`](https://github.com/nemolize/cg/commit/a63b0c312114a74d95436e37e650d299a98aeefd) - Codex's injected context (the `AGENTS.md` body, `<environment_context>`, and the goal and restart notices) is now treated like Claude's `isMeta` turns: left out of `--role user` searches and session dumps unless `--include-meta` is given, and always left out of `--role human`. The kind is read from the rollout's `content_item_kinds`; a message with any other kind, or without the field, stays visible.
+
+- [#247](https://github.com/nemolize/cg/pull/247) [`aadb586`](https://github.com/nemolize/cg/commit/aadb586964e32415af980c30501780698426295f) - `--branch` now matches Codex sessions too. Codex records the branch only once, on the rollout's `session_meta`, so a Codex hit matches on the branch its session started on, where Claude's `--branch` matches the branch at each turn. A rollout with no git branch (a session outside a repository) is still excluded. `--usage` records carry the same value, and the "searched Claude only" notice now names `--file` alone.
+
 ## 0.10.0
 
 ### Minor Changes
